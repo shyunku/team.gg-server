@@ -16,8 +16,9 @@ type SummonerDto struct {
 }
 
 func GetSummonerByName(name string) (*SummonerDto, error) {
+	incrementApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl("/lol/summoner/v4/summoners/by-name/" + name),
+		Url: CreateUrl(RegionKr, "/lol/summoner/v4/summoners/by-name/"+name),
 	})
 	if err != nil {
 		return nil, err
@@ -34,8 +35,9 @@ func GetSummonerByName(name string) (*SummonerDto, error) {
 }
 
 func GetSummonerByPuuid(puuid string) (*SummonerDto, error) {
+	incrementApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl("/lol/summoner/v4/summoners/by-puuid/" + puuid),
+		Url: CreateUrl(RegionKr, "/lol/summoner/v4/summoners/by-puuid/"+puuid),
 	})
 	if err != nil {
 		return nil, err

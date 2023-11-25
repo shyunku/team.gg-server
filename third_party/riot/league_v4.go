@@ -30,8 +30,9 @@ type LeagueItemDto struct {
 type LeagueDto []LeagueItemDto
 
 func GetLeaguesBySummonerId(summonerId string) (*LeagueDto, error) {
+	incrementApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl("/lol/league/v4/entries/by-summoner/" + summonerId),
+		Url: CreateUrl(RegionKr, "/lol/league/v4/entries/by-summoner/"+summonerId),
 	})
 	if err != nil {
 		return nil, err

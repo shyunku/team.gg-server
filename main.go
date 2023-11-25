@@ -8,14 +8,14 @@ import (
 	"os"
 	"team.gg-server/controllers"
 	"team.gg-server/core"
-	"team.gg-server/libs/crypto"
 	"team.gg-server/libs/database"
+	"team.gg-server/service"
 	"team.gg-server/third_party/riot"
 	"team.gg-server/util"
 	"time"
 )
 
-const VERSION = "0.0.1"
+const VERSION = "0.0.2"
 
 func main() {
 	fmt.Println(`
@@ -30,7 +30,7 @@ func main() {
 	log.Info("Version: ", VERSION)
 
 	// Create Jwt secret key if needed
-	crypto.PrintNewJwtSecret()
+	//crypto.PrintNewJwtSecret()
 
 	// Load environment variables
 	log.Info("Initializing environments...")
@@ -63,6 +63,12 @@ func main() {
 		os.Exit(-2)
 	}
 
+	// preload service
+	if err := service.Preload(); err != nil {
+		log.Error(err)
+		os.Exit(-3)
+	}
+
 	// print debug state
 	if core.DebugMode {
 		log.Debug("Running in debug mode...")
@@ -74,7 +80,7 @@ func main() {
 	log.Info("Initializing database...")
 	if _, err := database.Initialize(); err != nil {
 		log.Error(err)
-		os.Exit(-3)
+		os.Exit(-4)
 	}
 
 	// Init in-memory database

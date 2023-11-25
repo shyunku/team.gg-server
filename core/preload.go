@@ -3,20 +3,18 @@ package core
 import (
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
-	"team.gg-server/service"
 	core "team.gg-server/util"
 )
 
 var (
 	AppServerHost string
 	AppServerPort = os.Getenv("APP_SERVER_PORT")
-	DebugMode     = os.Getenv("DEBUG") == "true"
-
-	DataDragonVersion = ""
+	DebugMode     = false
+	UrgentMode    = false
 )
 
 func Preload() error {
-	log.Debugf("Preload started...")
+	log.Debugf("preload started...")
 
 	// load public ip
 	ipv4, err := core.GetPublicIp()
@@ -24,14 +22,14 @@ func Preload() error {
 		return err
 	}
 
-	DataDragonVersion, err = service.GetLatestDataDragonVersion()
-	if err != nil {
-		return err
-	}
-	log.Debugf("DataDragon version: %s", DataDragonVersion)
+	// load debug mode
+	DebugMode = os.Getenv("DEBUG") == "true"
+
+	// load urgent mode
+	UrgentMode = os.Getenv("URGENT") == "true"
 
 	AppServerHost = ipv4
 	AppServerPort = os.Getenv("APP_SERVER_PORT")
-	log.Debugf("server is running on public ip: %s:%s", AppServerHost, AppServerPort)
+	log.Debugf("server is active on public ip: %s:%s", AppServerHost, AppServerPort)
 	return nil
 }

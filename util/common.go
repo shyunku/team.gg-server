@@ -40,7 +40,7 @@ func CheckEnvironmentVariables(checkKeys []string) error {
 	return nil
 }
 
-func GetRootDirectory() string {
+func GetProjectRootDirectory() string {
 	_, b, _, _ := runtime.Caller(0)
 	return filepath.Dir(filepath.Dir(b))
 }

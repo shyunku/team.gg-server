@@ -21,8 +21,9 @@ type MasteryItemDto struct {
 type MasteryDto []MasteryItemDto
 
 func GetMasteryBySummonerId(summonerId string) (*MasteryDto, error) {
+	incrementApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl("/lol/champion-mastery/v4/champion-masteries/by-summoner/" + summonerId),
+		Url: CreateUrl(RegionKr, "/lol/champion-mastery/v4/champion-masteries/by-summoner/"+summonerId),
 	})
 	if err != nil {
 		return nil, err

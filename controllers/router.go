@@ -7,6 +7,7 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
 	"team.gg-server/controllers/middlewares"
+	"team.gg-server/controllers/test"
 	v1 "team.gg-server/controllers/v1"
 	"team.gg-server/core"
 )
@@ -32,6 +33,9 @@ func SetupRouter() *gin.Engine {
 
 	// platform routes
 	v1.UseV1Router(r)
+	if core.DebugMode {
+		test.UseTestRouter(r)
+	}
 
 	// 404
 	r.NoRoute(func(c *gin.Context) {

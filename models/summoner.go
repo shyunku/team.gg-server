@@ -23,7 +23,7 @@ type SummonerEntity struct {
 
 func (s *SummonerEntity) UpsertTx(tx *sql.Tx) error {
 	if _, err := tx.Exec(`
-		INSERT INTO summoner 
+		INSERT INTO summoners
 		    (account_id, profile_icon_id, revision_date, name, id, puuid, summoner_level, shorten_name, last_updated_at, hits) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
 		ON DUPLICATE KEY UPDATE 
@@ -73,7 +73,7 @@ func StrictGetSummonerByPuuid(puuid string) (*SummonerEntity, bool, error) {
 
 func GetSummonerByPuuid(puuid string) (*SummonerEntity, error) {
 	var summoner SummonerEntity
-	if err := database.DB.Get(&summoner, "SELECT * FROM summoner WHERE puuid = ?", puuid); err != nil {
+	if err := database.DB.Get(&summoner, "SELECT * FROM summoners WHERE puuid = ?", puuid); err != nil {
 		return nil, err
 	}
 	return &summoner, nil
@@ -82,7 +82,7 @@ func GetSummonerByPuuid(puuid string) (*SummonerEntity, error) {
 func GetSummonerByShortenName(name string) (*SummonerEntity, error) {
 	shortenName := util.ShortenSummonerName(name)
 	var summoner SummonerEntity
-	if err := database.DB.Get(&summoner, "SELECT * FROM summoner WHERE shorten_name = ?", shortenName); err != nil {
+	if err := database.DB.Get(&summoner, "SELECT * FROM summoners WHERE shorten_name = ?", shortenName); err != nil {
 		return nil, err
 	}
 	return &summoner, nil
