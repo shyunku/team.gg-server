@@ -8,14 +8,17 @@ import (
 
 type MatchIdsDto []string
 
-func GetMatchIdsInterval(puuid string, start *time.Time, end *time.Time) (*MatchIdsDto, error) {
+func GetMatchIdsInterval(puuid string, start *time.Time, end *time.Time, cnt int) (*MatchIdsDto, error) {
 	incrementApiCalls()
-	var query map[string]interface{}
+	query := make(map[string]interface{})
 	if start != nil {
-		query["start"] = start.Unix()
+		query["startTime"] = start.Unix()
 	}
 	if end != nil {
-		query["end"] = end.Unix()
+		query["endTime"] = end.Unix()
+	}
+	if cnt > 0 {
+		query["count"] = cnt
 	}
 	resp, err := http.Get(http.GetRequest{
 		Url: CreateUrlWithQuery(RegionAsia, "/lol/match/v5/matches/by-puuid/"+puuid+"/ids", query),

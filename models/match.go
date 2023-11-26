@@ -3,10 +3,10 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"team.gg-server/libs/database"
+	"team.gg-server/libs/db"
 )
 
-type MatchEntity struct {
+type MatchDAO struct {
 	MatchId string `db:"match_id" json:"matchId"`
 
 	DataVersion        string `db:"data_version" json:"dataVersion"`
@@ -25,8 +25,8 @@ type MatchEntity struct {
 	TournamentCode     string `db:"tournament_code" json:"tournamentCode"`
 }
 
-func (m *MatchEntity) InsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (m *MatchDAO) Insert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO matches
 		    (data_version, match_id, game_creation, game_duration, game_end_timestamp, game_id, game_mode, game_name, game_start_timestamp, game_type, game_version, map_id, platform_id, queue_id, tournament_code) 
 		VALUE
@@ -38,25 +38,48 @@ func (m *MatchEntity) InsertTx(tx *sql.Tx) error {
 	return nil
 }
 
-func StrictGetMatchByMatchId(matchId string) (*MatchEntity, bool, error) {
-	// check if match exists in db
-	matchEntity, err := GetMatchEntityByMatchId(matchId)
-	if err != nil {
+func GetMatchDAO(db db.Context, matchId string) (*MatchDAO, bool, error) {
+	var matchEntity MatchDAO
+	if err := db.Get(&matchEntity, "SELECT * FROM matches WHERE match_id = ?", matchId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
-	if matchEntity == nil {
-		return nil, false, nil
-	}
-	return matchEntity, true, nil
+	return &matchEntity, true, nil
 }
 
-func GetMatchEntityByMatchId(matchId string) (*MatchEntity, error) {
-	var match MatchEntity
-	if err := database.DB.Get(&match, "SELECT * FROM matches WHERE match_id = ?", matchId); err != nil {
+func GetSummonerMatchDAOs_before(db db.Context, puuid string, before int64, limit int64) ([]*MatchDAO, error) {
+	var matches []*MatchDAO
+	if err := db.Select(&matches, `
+		SELECT m.*
+		FROM summoner_matches sm
+		LEFT JOIN matches m ON sm.match_id = m.match_id
+		WHERE sm.puuid = ?
+		AND m.game_end_timestamp < ?
+		ORDER BY m.game_end_timestamp DESC 
+		LIMIT ?;
+	`, puuid, before, limit); err != nil {
 		return nil, err
 	}
-	return &match, nil
+	return matches, nil
+}
+
+// GetOldestSummonerMatchDAO returns the oldest match for a summoner
+func GetOldestSummonerMatchDAO(db db.Context, puuid string) (*MatchDAO, bool, error) {
+	var matchEntity MatchDAO
+	if err := db.Get(&matchEntity, `
+		SELECT m.*
+		FROM summoner_matches sm
+		LEFT JOIN matches m ON sm.match_id = m.match_id
+		WHERE sm.puuid = ?
+		ORDER BY m.game_end_timestamp DESC
+		LIMIT 1;
+	`, puuid); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return &matchEntity, true, nil
 }

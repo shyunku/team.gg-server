@@ -1,8 +1,10 @@
 package models
 
-import "database/sql"
+import (
+	"team.gg-server/libs/db"
+)
 
-type MatchTeamEntity struct {
+type MatchTeamDAO struct {
 	MatchId string `db:"match_id" json:"matchId"`
 	TeamId  int    `db:"team_id" json:"teamId"`
 	Win     bool   `db:"win" json:"win"`
@@ -21,8 +23,8 @@ type MatchTeamEntity struct {
 	TowerKills      int  `db:"tower_kills" json:"towerKills"`
 }
 
-func (s *MatchTeamEntity) InsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (s *MatchTeamDAO) Insert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO match_teams
 		    (match_id, team_id, win, baron_first, baron_kills, champion_first, 
 		     champion_kills, dragon_first, dragon_kills, inhibitor_first, 

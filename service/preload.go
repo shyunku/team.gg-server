@@ -16,6 +16,68 @@ import (
 
 // https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/ko_kr/v1/
 
+var (
+	DataDragonVersion      = ""
+	LocalDataDragonVersion = ""
+
+	Champions      = make(map[string]ChampionDataVO)      // key: champion key
+	SummonerSpells = make(map[string]SummonerSpellDataVO) // key: summoner spell key
+	Perks          = make(map[int]PerkInfoVO)             // key: perk id
+	PerkStyles     = make(map[int]PerkStyleInfoVO)        // key: perk style id
+)
+
+func Preload() error {
+	log.Debugf("Service preload started...")
+
+	// load data dragon version
+	var err error
+	DataDragonVersion, err = GetLatestDataDragonVersion()
+	if err != nil {
+		return err
+	}
+	log.Debugf("DataDragon version: %s", DataDragonVersion)
+
+	// manage & load data dragon files
+	if err := SanitizeAndLoadDataDragonFile(); err != nil {
+		return err
+	}
+
+	// load summoner spell data
+	if err := LoadSummonerSpellsData(); err != nil {
+		return err
+	}
+
+	// load champion data
+	championsInfo, err := GetChampionData()
+	if err != nil {
+		return err
+	}
+	for _, champion := range championsInfo.Data {
+		Champions[champion.Key] = champion
+	}
+	log.Debugf("%d Champion data loaded", len(Champions))
+
+	// load perks data
+	perksData, err := GetCDragonPerksData()
+	if err != nil {
+		return err
+	}
+	for _, perk := range perksData {
+		Perks[perk.Id] = perk
+	}
+
+	// load perk styles data
+	perkStylesData, err := GetCDragonPerkStylesData()
+	if err != nil {
+		return err
+	}
+	for _, perkStyle := range (*perkStylesData).Styles {
+		PerkStyles[perkStyle.Id] = perkStyle
+	}
+
+	return nil
+}
+
 func SanitizeAndLoadDataDragonFile() error {
 	// check if latest data dragon is downloaded
 	projectRoot := util.GetProjectRootDirectory()
@@ -206,7 +268,7 @@ func LoadSummonerSpellsData() error {
 	}
 
 	// save to memory
-	SummonerSpells = map[string]SummonerSpellInfo{}
+	SummonerSpells = map[string]SummonerSpellDataVO{}
 	for _, summonerSpell := range SummonerSpellsDto.Data {
 		SummonerSpells[summonerSpell.Key] = summonerSpell
 	}
@@ -215,14 +277,7 @@ func LoadSummonerSpellsData() error {
 	return nil
 }
 
-type ChampionsInfoDto struct {
-	Type    string                  `json:"type"`
-	Format  string                  `json:"format"`
-	Version string                  `json:"version"`
-	Data    map[string]ChampionInfo `json:"data"`
-}
-
-func GetLatestChampionData() (*ChampionsInfoDto, error) {
+func GetChampionData() (*ChampionsInfoDto, error) {
 	resp, err := http.Get(http.GetRequest{
 		Url: fmt.Sprintf("https://ddragon.leagueoflegends.com/cdn/%s/data/ko_KR/champion.json", DataDragonVersion),
 	})
@@ -260,21 +315,6 @@ func GetLatestDataDragonVersion() (string, error) {
 	return versions[0], nil
 }
 
-type PerkInfo struct {
-	Id                                  int         `json:"id"`
-	Name                                string      `json:"name"`
-	MajorChangePatchVersion             string      `json:"majorChangePatchVersion"`
-	ToolTip                             string      `json:"tooltip"`
-	ShortDesc                           string      `json:"shortDesc"`
-	LongDesc                            string      `json:"longDesc"`
-	RecommendationDescriptor            string      `json:"recommendationDescriptor"`
-	IconPath                            string      `json:"iconPath"`
-	EndOfGameStatDescs                  []string    `json:"endOfGameStatDescs"`
-	RecommendationDescriptionAttributes interface{} `json:"recommendationDescriptionAttributes"`
-}
-
-type PerksInfoDto []PerkInfo
-
 func GetCDragonPerksData() (PerksInfoDto, error) {
 	path := "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/ko_kr/v1/perks.json"
 	resp, err := http.Get(http.GetRequest{
@@ -290,38 +330,6 @@ func GetCDragonPerksData() (PerksInfoDto, error) {
 	}
 
 	return perksData, nil
-}
-
-type PerkStyleInfo struct {
-	Id               int         `json:"id"`
-	Name             string      `json:"name"`
-	ToolTip          string      `json:"tooltip"`
-	IconPath         string      `json:"iconPath"`
-	AssetMap         interface{} `json:"assetMap"`
-	IsAdvanced       bool        `json:"isAdvanced"`
-	AllowedSubStyles []int       `json:"allowedSubStyles"`
-	SubStyleBonus    []struct {
-		StyleId int `json:"styleId"`
-		PerkId  int `json:"perkId"`
-	} `json:"subStyleBonus"`
-	Slots []struct {
-		Type      string `json:"type"`
-		SlotLabel string `json:"slotLabel"`
-		Perks     []int  `json:"perks"`
-	} `json:"slots"`
-	DefaultPageName            string `json:"defaultPageName"`
-	DefaultSubStyle            int    `json:"defaultSubStyle"`
-	DefaultPerks               []int  `json:"defaultPerks"`
-	DefaultPerksWhenSplashed   []int  `json:"defaultPerksWhenSplashed"`
-	DefaultStatModsPerSubStyle []struct {
-		Id    string `json:"id"`
-		Perks []int  `json:"perks"`
-	} `json:"defaultStatModsPerSubStyle"`
-}
-
-type PerkStylesInfoDto struct {
-	SchemeVersion string          `json:"schemeVersion"`
-	Styles        []PerkStyleInfo `json:"styles"`
 }
 
 func GetCDragonPerkStylesData() (*PerkStylesInfoDto, error) {

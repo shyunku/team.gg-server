@@ -150,6 +150,7 @@ create table match_participant_perk_styles
     match_participant_id varchar(255) not null,
     style_id             varchar(255) not null,
     description          varchar(255) not null,
+    style                int          not null,
     constraint match_participant_perk_styles_pk
         unique (style_id),
     constraint match_participant_perk_styles_id_fk
@@ -246,28 +247,10 @@ create table summoners
         primary key,
     summoner_level  bigint       not null,
     shorten_name    varchar(255) not null,
-    last_updated_at datetime     not null,
-    hits            int          not null
+    last_updated_at datetime     not null
 );
 
-create table masteries
-(
-    puuid                            varchar(255) not null,
-    champion_points_until_next_level bigint       not null,
-    chest_granted                    tinyint(1)   not null,
-    champion_id                      bigint       not null,
-    last_play_time                   datetime     not null,
-    champion_level                   int          not null,
-    champion_points                  int          not null,
-    champion_points_since_last_level bigint       not null,
-    tokens_earned                    int          not null,
-    primary key (puuid, champion_id),
-    constraint masteries_summoner_puuid_fk
-        foreign key (puuid) references summoners (puuid)
-            on update cascade on delete cascade
-);
-
-create table ranks
+create table leagues
 (
     puuid         varchar(255) not null,
     league_id     varchar(255) not null,
@@ -287,6 +270,23 @@ create table ranks
     ms_progress   varchar(255) null,
     primary key (puuid, league_id, queue_type),
     constraint ranks_summoner_puuid_fk
+        foreign key (puuid) references summoners (puuid)
+            on update cascade on delete cascade
+);
+
+create table masteries
+(
+    puuid                            varchar(255) not null,
+    champion_points_until_next_level bigint       not null,
+    chest_granted                    tinyint(1)   not null,
+    champion_id                      bigint       not null,
+    last_play_time                   datetime     not null,
+    champion_level                   int          not null,
+    champion_points                  int          not null,
+    champion_points_since_last_level bigint       not null,
+    tokens_earned                    int          not null,
+    primary key (puuid, champion_id),
+    constraint masteries_summoner_puuid_fk
         foreign key (puuid) references summoners (puuid)
             on update cascade on delete cascade
 );

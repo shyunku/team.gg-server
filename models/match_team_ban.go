@@ -1,8 +1,10 @@
 package models
 
-import "database/sql"
+import (
+	"team.gg-server/libs/db"
+)
 
-type MatchTeamBanEntity struct {
+type MatchTeamBanDAO struct {
 	MatchId string `db:"match_id" json:"matchId"`
 	TeamId  int    `db:"team_id" json:"teamId"`
 
@@ -10,8 +12,8 @@ type MatchTeamBanEntity struct {
 	PickTurn   int `db:"pick_turn" json:"pickTurn"`
 }
 
-func (s *MatchTeamBanEntity) InsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (s *MatchTeamBanDAO) Insert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO match_team_bans
 		    (match_id, team_id, champion_id, pick_turn) 
 		VALUES (?, ?, ?, ?)`,

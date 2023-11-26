@@ -1,6 +1,7 @@
-package database
+package db
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -8,7 +9,7 @@ import (
 	"os"
 )
 
-var DB *sqlx.DB = nil
+var Root *sqlx.DB = nil
 
 type DatabaseConfig struct {
 	User         string
@@ -68,6 +69,12 @@ func Initialize() (db *sqlx.DB, err error) {
 	if err = db.Ping(); err != nil {
 		return nil, errors.New("failed to connect database: " + err.Error())
 	}
-	DB = db
+	Root = db
 	return db, nil
+}
+
+type Context interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Get(dest interface{}, query string, args ...interface{}) error
+	Select(dest interface{}, query string, args ...interface{}) error
 }

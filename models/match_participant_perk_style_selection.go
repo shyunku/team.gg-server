@@ -1,8 +1,10 @@
 package models
 
-import "database/sql"
+import (
+	"team.gg-server/libs/db"
+)
 
-type MatchParticipantPerkStyleSelectionEntity struct {
+type MatchParticipantPerkStyleSelectionDAO struct {
 	StyleId string `db:"style_id" json:"styleId"`
 
 	Perk int `db:"perk" json:"perk"`
@@ -11,8 +13,8 @@ type MatchParticipantPerkStyleSelectionEntity struct {
 	Var3 int `db:"var3" json:"var3"`
 }
 
-func (m *MatchParticipantPerkStyleSelectionEntity) InsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (m *MatchParticipantPerkStyleSelectionDAO) Insert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO match_participant_perk_style_selections
 		    (style_id, perk, var1, var2, var3) 
 		VALUES (?, ?, ?, ?, ?)`,

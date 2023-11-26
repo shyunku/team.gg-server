@@ -1,12 +1,11 @@
 package models
 
 import (
-	"database/sql"
-	"team.gg-server/libs/database"
+	"team.gg-server/libs/db"
 	"time"
 )
 
-type MasteryEntity struct {
+type MasteryDAO struct {
 	Puuid                        string    `db:"puuid" json:"puuid"`
 	ChampionPointsUntilNextLevel int64     `db:"champion_points_until_next_level" json:"championPointsUntilNextLevel"`
 	ChestGranted                 bool      `db:"chest_granted" json:"chestGranted"`
@@ -18,8 +17,8 @@ type MasteryEntity struct {
 	TokensEarned                 int       `db:"tokens_earned" json:"tokensEarned"`
 }
 
-func (m *MasteryEntity) Upsert(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (m *MasteryDAO) Upsert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO masteries
 		    (puuid, champion_points_until_next_level, chest_granted, champion_id, last_play_time, champion_level, champion_points, champion_points_since_last_level, tokens_earned) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
@@ -32,9 +31,9 @@ func (m *MasteryEntity) Upsert(tx *sql.Tx) error {
 	return nil
 }
 
-func GetMasteriesByPuuidTx(puuid string) ([]*MasteryEntity, error) {
-	var masteries []*MasteryEntity
-	if err := database.DB.Select(&masteries, "SELECT * FROM masteries WHERE puuid = ?", puuid); err != nil {
+func GetMasteryDAOs(db db.Context, puuid string) ([]*MasteryDAO, error) {
+	var masteries []*MasteryDAO
+	if err := db.Select(&masteries, "SELECT * FROM masteries WHERE puuid = ?", puuid); err != nil {
 		return nil, err
 	}
 	return masteries, nil

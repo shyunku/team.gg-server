@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	EnableDebug = false
+	EnableDebug = true
 )
 
 type GetRequest struct {

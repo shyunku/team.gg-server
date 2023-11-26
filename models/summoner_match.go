@@ -3,15 +3,16 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"team.gg-server/libs/db"
 )
 
-type SummonerMatchEntity struct {
+type SummonerMatchDAO struct {
 	Puuid   string `db:"puuid" json:"puuid"`
 	MatchId string `db:"match_id" json:"matchId"`
 }
 
-func (s *SummonerMatchEntity) UpsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (s *SummonerMatchDAO) Upsert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO summoner_matches
 		    (puuid, match_id) 
 		VALUES (?, ?) 
@@ -24,25 +25,14 @@ func (s *SummonerMatchEntity) UpsertTx(tx *sql.Tx) error {
 	return nil
 }
 
-func StrictGetSummonerMatch(tx *sql.Tx, puuid string, matchId string) (*SummonerMatchEntity, bool, error) {
+func GetSummonerMatchDAO(db db.Context, puuid string, matchId string) (*SummonerMatchDAO, bool, error) {
 	// check if summoner exists in db
-	summonerMatch, err := GetSummonerMatchTx(tx, puuid, matchId)
-	if err != nil {
+	var summonerMatch SummonerMatchDAO
+	if err := db.Get(&summonerMatch, "SELECT * FROM summoner_matches WHERE puuid = ? AND match_id = ?", puuid, matchId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
-	if summonerMatch == nil {
-		return nil, false, nil
-	}
-	return summonerMatch, true, nil
-}
-
-func GetSummonerMatchTx(tx *sql.Tx, puuid string, matchId string) (*SummonerMatchEntity, error) {
-	var summonerMatch SummonerMatchEntity
-	if err := tx.QueryRow("SELECT * FROM summoner_matches WHERE puuid = ? AND match_id = ?", puuid, matchId).Scan(&summonerMatch.Puuid, &summonerMatch.MatchId); err != nil {
-		return nil, err
-	}
-	return &summonerMatch, nil
+	return &summonerMatch, true, nil
 }

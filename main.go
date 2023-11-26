@@ -8,14 +8,14 @@ import (
 	"os"
 	"team.gg-server/controllers"
 	"team.gg-server/core"
-	"team.gg-server/libs/database"
+	"team.gg-server/libs/db"
 	"team.gg-server/service"
 	"team.gg-server/third_party/riot"
 	"team.gg-server/util"
 	"time"
 )
 
-const VERSION = "0.0.2"
+const VERSION = "0.1.0"
 
 func main() {
 	fmt.Println(`
@@ -78,14 +78,14 @@ func main() {
 
 	// Init database
 	log.Info("Initializing database...")
-	if _, err := database.Initialize(); err != nil {
+	if _, err := db.Initialize(); err != nil {
 		log.Error(err)
 		os.Exit(-4)
 	}
 
 	// Init in-memory database
 	log.Info("Initializing in-memory database...")
-	database.InMemoryDB = database.NewRedis()
+	db.InMemoryDB = db.NewRedis()
 
 	// Init 3rd party services
 	log.Info("Initializing 3rd party services...")

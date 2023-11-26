@@ -1,12 +1,6 @@
 package service
 
-import (
-	"database/sql"
-	"errors"
-	"team.gg-server/libs/database"
-)
-
-type SummonerRecentMatchSummaryEntity struct {
+type SummonerMatchSummaryMXDAO struct {
 	MatchId            string `db:"match_id" json:"matchId"`
 	DataVersion        string `db:"data_version" json:"dataVersion"`
 	GameCreation       int64  `db:"game_creation" json:"gameCreation"`
@@ -85,19 +79,4 @@ type SummonerRecentMatchSummaryEntity struct {
 	GameEndedInEarlySurrender      bool   `db:"game_ended_in_early_surrender" json:"gameEndedInEarlySurrender"`
 	GameEndedInSurrender           bool   `db:"game_ended_in_surrender" json:"gameEndedInSurrender"`
 	TeamEarlySurrendered           bool   `db:"team_early_surrendered" json:"teamEarlySurrendered"`
-}
-
-func GetSummonerRecentMatchSummaries(puuid string) ([]*SummonerRecentMatchSummaryEntity, error) {
-	var summaries []*SummonerRecentMatchSummaryEntity
-	if err := database.DB.Select(&summaries, `
-		SELECT m.*, mp.*
-		FROM summoner_matches sm
-		LEFT JOIN matches m ON sm.match_id = m.match_id
-		LEFT JOIN match_participants mp ON mp.match_id = m.match_id AND mp.puuid = sm.puuid
-		WHERE sm.puuid = ?
-		ORDER BY m.game_end_timestamp DESC
-		LIMIT 20`, puuid); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	return summaries, nil
 }

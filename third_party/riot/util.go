@@ -7,9 +7,9 @@ func CreateUrl(region string, path string) string {
 }
 
 func CreateUrlWithQuery(region string, path string, queries map[string]interface{}) string {
-	query := "?"
+	query := ""
 	for key, value := range queries {
-		query += key + "=" + value.(string) + "&"
+		query += fmt.Sprintf("&%s=%v", key, value)
 	}
-	return fmt.Sprintf("https://%s.api.riotgames.com%s?api_key=%s", region, path, apiKey)
+	return fmt.Sprintf("https://%s.api.riotgames.com%s?api_key=%s%s", region, path, apiKey, query)
 }

@@ -3,10 +3,10 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"team.gg-server/libs/database"
+	"team.gg-server/libs/db"
 )
 
-type MatchParticipantEntity struct {
+type MatchParticipantDAO struct {
 	MatchId            string `db:"match_id" json:"matchId"`
 	ParticipantId      int    `db:"participant_id" json:"participantId"`
 	MatchParticipantId string `db:"match_participant_id" json:"matchParticipantId"`
@@ -89,8 +89,8 @@ type MatchParticipantEntity struct {
 	TeamEarlySurrendered      bool `db:"team_early_surrendered" json:"teamEarlySurrendered"`
 }
 
-func (m *MatchParticipantEntity) InsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
+func (m *MatchParticipantDAO) Insert(db db.Context) error {
+	if _, err := db.Exec(`
 		INSERT INTO match_participants
 		    (match_id, participant_id, match_participant_id, puuid, kills, deaths, assists, 
 		     champion_id, champion_level, champion_name, champ_experience, summoner_level, 
@@ -129,11 +129,12 @@ func (m *MatchParticipantEntity) InsertTx(tx *sql.Tx) error {
 
 }
 
-func GetMatchParticipantsByMatchId(matchId string) ([]MatchParticipantEntity, error) {
-	var matchParticipants []MatchParticipantEntity
-	if err := database.DB.Select(&matchParticipants, "SELECT * FROM match_participants WHERE match_id = ?", matchId); err != nil {
+func GetMatchParticipantDAOs(db db.Context, matchId string) ([]MatchParticipantDAO, error) {
+	var matchParticipants []MatchParticipantDAO
+	if err := db.Select(&matchParticipants,
+		"SELECT * FROM match_participants WHERE match_id = ?", matchId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]MatchParticipantEntity, 0), nil
+			return make([]MatchParticipantDAO, 0), nil
 		}
 		return nil, err
 	}

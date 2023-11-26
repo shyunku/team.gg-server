@@ -3,10 +3,10 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"team.gg-server/libs/database"
+	"team.gg-server/libs/db"
 )
 
-type LeagueEntity struct {
+type LeagueDAO struct {
 	Puuid        string `db:"puuid" json:"puuid"`
 	LeagueId     string `db:"league_id" json:"leagueId"`
 	QueueType    string `db:"queue_type" json:"queueType"`
@@ -25,9 +25,9 @@ type LeagueEntity struct {
 	MsProgress   string `db:"ms_progress" json:"msProgress"`
 }
 
-func (l *LeagueEntity) UpsertTx(tx *sql.Tx) error {
-	if _, err := tx.Exec(`
-		INSERT INTO ranks
+func (l *LeagueDAO) Upsert(db db.Context) error {
+	if _, err := db.Exec(`
+		INSERT INTO leagues
 		    (puuid, league_id, queue_type, tier, league_rank, league_points, wins, losses, hot_streak, veteran, fresh_blood, inactive, ms_target, ms_wins, ms_losses, ms_progress) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
@@ -40,51 +40,17 @@ func (l *LeagueEntity) UpsertTx(tx *sql.Tx) error {
 	return nil
 }
 
-func StrictGetLeagueByPuuid(puuid string) (*LeagueEntity, bool, error) {
+func GetLeagueDAO(db db.Context, puuid string, queueType string) (*LeagueDAO, bool, error) {
 	// check if league exists in db
-	leagueEntity, err := GetLeagueByPuuid(puuid)
-	if err != nil {
-		return nil, false, err
-	}
-	if leagueEntity == nil {
-		return nil, false, nil
-	}
-	return leagueEntity, true, nil
-}
-
-func StrictGetRankByPuuidAndQueueType(puuid string, queueType string) (*LeagueEntity, bool, error) {
-	// check if league exists in db
-	leagueEntity, err := GetRankByPuuidAndQueueType(puuid, queueType)
-	if err != nil {
+	var leagueEntity LeagueDAO
+	if err := db.Get(&leagueEntity, `
+		SELECT *
+		FROM leagues
+		WHERE puuid = ? AND queue_type = ?`, puuid, queueType); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
-	if leagueEntity == nil {
-		return nil, false, nil
-	}
-	return leagueEntity, true, nil
-}
-
-func GetLeagueByPuuid(puuid string) (*LeagueEntity, error) {
-	var leagueEntity LeagueEntity
-	if err := database.DB.Get(&leagueEntity, `
-		SELECT *
-		FROM ranks
-		WHERE puuid = ?`, puuid); err != nil {
-		return nil, err
-	}
-	return &leagueEntity, nil
-}
-
-func GetRankByPuuidAndQueueType(puuid string, queueType string) (*LeagueEntity, error) {
-	var leagueEntity LeagueEntity
-	if err := database.DB.Get(&leagueEntity, `
-		SELECT *
-		FROM ranks
-		WHERE puuid = ? AND queue_type = ?`, puuid, queueType); err != nil {
-		return nil, err
-	}
-	return &leagueEntity, nil
+	return &leagueEntity, true, nil
 }
