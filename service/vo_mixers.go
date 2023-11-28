@@ -46,6 +46,8 @@ func SummonerMatchSummaryTeamMateMixer(d models.MatchParticipantDAO) TeammateVO 
 	return TeammateVO{
 		ChampionId:            d.ChampionId,
 		SummonerName:          d.SummonerName,
+		RiotIdName:            d.RiotIdName,
+		RiotIdTagLine:         d.RiotIdTagLine,
 		Puuid:                 d.Puuid,
 		TotalDealtToChampions: d.TotalDamageDealtToChampions,
 		Kills:                 d.Kills,

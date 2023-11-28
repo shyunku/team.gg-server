@@ -87,6 +87,8 @@ type SummonerMatchParticipantVO struct {
 type TeammateVO struct {
 	ChampionId            int    `json:"championId"`
 	SummonerName          string `json:"summonerName"`
+	RiotIdName            string `json:"riotIdName"`
+	RiotIdTagLine         string `json:"riotIdTagLine"`
 	Puuid                 string `json:"puuid"`
 	TotalDealtToChampions int    `json:"totalDealtToChampions"`
 	Kills                 int    `json:"kills"`
