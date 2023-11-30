@@ -19,6 +19,7 @@ func UseV1Router(r *gin.Engine) {
 	g.GET("/summoner", GetSummonerInfo)
 	g.POST("/renewSummoner", RenewSummonerInfo)
 	g.POST("/loadMatches", LoadMatches)
+	g.GET("/ingame", GetIngameInfo)
 }
 
 func GetSummonerInfo(c *gin.Context) {
@@ -28,7 +29,17 @@ func GetSummonerInfo(c *gin.Context) {
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
 	}
 
-	summonerDAO, exists, err := models.GetSummonerDAO_byName(db.Root, req.SummonerName)
+	tagLine := "KR1"
+	if req.TagLine != nil {
+		tagLine = *req.TagLine
+	}
+
+	if req.GameName == "" {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid game name")
+		return
+	}
+
+	summonerDAO, exists, err := models.GetSummonerDAO_byNameTag(db.Root, req.GameName, tagLine)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -43,10 +54,10 @@ func GetSummonerInfo(c *gin.Context) {
 			return
 		}
 
-		summoner, status, err := riot.GetSummonerByName(req.SummonerName)
+		account, status, err := riot.GetAccountByRiotId(req.GameName, tagLine)
 		if err != nil {
 			if status == http.StatusNotFound {
-				util.AbortWithStrJson(c, http.StatusNotFound, "invalid summoner name")
+				util.AbortWithStrJson(c, http.StatusNotFound, "invalid game name")
 				return
 			}
 			log.Error(err)
@@ -54,7 +65,18 @@ func GetSummonerInfo(c *gin.Context) {
 			return
 		}
 
-		if err := service.RenewSummonerTotal(tx, summoner.Puuid); err != nil {
+		//summoner, status, err := riot.GetSummonerByName(req.SummonerName)
+		//if err != nil {
+		//	if status == http.StatusNotFound {
+		//		util.AbortWithStrJson(c, http.StatusNotFound, "invalid summoner name")
+		//		return
+		//	}
+		//	log.Error(err)
+		//	util.AbortWithStrJson(c, http.StatusBadRequest, "internal server error")
+		//	return
+		//}
+
+		if err := service.RenewSummonerTotal(tx, account.Puuid); err != nil {
 			log.Error(err)
 			_ = tx.Rollback()
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -69,7 +91,7 @@ func GetSummonerInfo(c *gin.Context) {
 		}
 
 		// retry
-		summonerDAO, exists, err = models.GetSummonerDAO_byName(db.Root, req.SummonerName)
+		summonerDAO, exists, err = models.GetSummonerDAO_byNameTag(db.Root, req.GameName, tagLine)
 		if err != nil {
 			log.Error(err)
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -199,6 +221,54 @@ func LoadMatches(c *gin.Context) {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func GetIngameInfo(c *gin.Context) {
+	var req GetIngameInfoRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+	}
+
+	summonerDAO, exists, err := models.GetSummonerDAO_byPuuid(db.Root, req.Puuid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid puuid")
+		return
+	}
+
+	spectatorInfo, _, err := riot.GetSpectatorInfo(summonerDAO.Id)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	team1 := make([]service.IngameParticipantVO, 0)
+	team2 := make([]service.IngameParticipantVO, 0)
+	for _, participant := range spectatorInfo.Participants {
+		if participant.TeamId == 100 {
+			team1 = append(team1, service.IngameParticipantMixer(participant))
+		} else {
+			team2 = append(team2, service.IngameParticipantMixer(participant))
+		}
+	}
+
+	resp := GetIngameInfoResponseDto{
+		GameType:          spectatorInfo.GameType,
+		MapId:             spectatorInfo.MapId,
+		GameStartTime:     spectatorInfo.GameStartTime,
+		GameMode:          spectatorInfo.GameMode,
+		GameQueueConfigId: spectatorInfo.GameQueueConfigId,
+		Team1:             team1,
+		Team2:             team2,
 	}
 
 	c.JSON(http.StatusOK, resp)

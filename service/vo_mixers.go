@@ -3,6 +3,7 @@ package service
 import (
 	"strconv"
 	"team.gg-server/models"
+	"team.gg-server/third_party/riot"
 )
 
 // vo_mixers manage conversion of VAO -> VO
@@ -10,6 +11,8 @@ import (
 func SummonerSummaryMixer(d models.SummonerDAO) SummonerSummaryVO {
 	return SummonerSummaryVO{
 		ProfileIconId: d.ProfileIconId,
+		GameName:      d.GameName,
+		TagLine:       d.TagLine,
 		Name:          d.Name,
 		Puuid:         d.Puuid,
 		SummonerLevel: d.SummonerLevel,
@@ -120,5 +123,14 @@ func SummonerMatchSummaryMixer(d SummonerMatchSummaryMXDAO, myStat SummonerMatch
 		MyStat:             myStat,
 		Team1:              team1,
 		Team2:              team2,
+	}
+}
+
+func IngameParticipantMixer(d riot.SpectatorParticipantDto) IngameParticipantVO {
+	return IngameParticipantVO{
+		ChampionId:    d.ChampionId,
+		ProfileIconId: d.ProfileIconId,
+		SummonerName:  d.SummonerName,
+		SummonerId:    d.SummonerId,
 	}
 }

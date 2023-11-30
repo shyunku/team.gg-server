@@ -60,7 +60,13 @@ func RenewSummonerInfoByPuuid(db db.Context, puuid string) error {
 		return err
 	}
 
-	if err := renewSummonerInfo(db, summoner); err != nil {
+	account, _, err := riot.GetAccountByPuuid(puuid)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	if err := renewSummonerInfo(db, summoner, account); err != nil {
 		log.Error(err)
 		return err
 	}
@@ -68,18 +74,21 @@ func RenewSummonerInfoByPuuid(db db.Context, puuid string) error {
 	return nil
 }
 
-func renewSummonerInfo(db db.Context, summoner *riot.SummonerDto) error {
+func renewSummonerInfo(db db.Context, summoner *riot.SummonerDto, account *riot.AccountByRiotIdDto) error {
 	// make new summoner DAO
 	summonerDao := &models.SummonerDAO{
-		AccountId:     summoner.AccountId,
-		ProfileIconId: summoner.ProfileIconId,
-		RevisionDate:  summoner.RevisionDate,
-		Name:          summoner.Name,
-		Id:            summoner.Id,
-		Puuid:         summoner.Puuid,
-		SummonerLevel: summoner.SummonerLevel,
-		ShortenName:   util.ShortenSummonerName(summoner.Name),
-		LastUpdatedAt: time.Now(),
+		AccountId:       summoner.AccountId,
+		ProfileIconId:   summoner.ProfileIconId,
+		RevisionDate:    summoner.RevisionDate,
+		GameName:        account.GameName,
+		TagLine:         account.TagLine,
+		Name:            summoner.Name,
+		Id:              summoner.Id,
+		Puuid:           summoner.Puuid,
+		SummonerLevel:   summoner.SummonerLevel,
+		ShortenGameName: util.ShortenSummonerName(account.GameName),
+		ShortenName:     util.ShortenSummonerName(summoner.Name),
+		LastUpdatedAt:   time.Now(),
 	}
 
 	// insert summoner DAO to db

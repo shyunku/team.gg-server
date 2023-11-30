@@ -6,6 +6,8 @@ import "time"
 
 type SummonerSummaryVO struct {
 	ProfileIconId int       `json:"profileIconId"`
+	GameName      string    `json:"gameName"`
+	TagLine       string    `json:"tagLine"`
 	Name          string    `json:"name"`
 	Puuid         string    `json:"puuid"`
 	SummonerLevel int64     `json:"summonerLevel"`
@@ -106,6 +108,13 @@ type MatchSummaryVO struct {
 	MyStat             SummonerMatchParticipantVO `json:"myStat"`
 	Team1              []TeammateVO               `json:"team1"`
 	Team2              []TeammateVO               `json:"team2"`
+}
+
+type IngameParticipantVO struct {
+	ChampionId    int64  `json:"championId"`
+	ProfileIconId int64  `json:"profileIconId"`
+	SummonerName  string `json:"summonerName"`
+	SummonerId    string `json:"summonerId"`
 }
 
 /* ------------------------ Preload VOs ------------------------ */

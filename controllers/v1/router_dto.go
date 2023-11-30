@@ -3,7 +3,8 @@ package v1
 import "team.gg-server/service"
 
 type GetSummonerInfoRequestDto struct {
-	SummonerName string `form:"summonerName" binding:"required"`
+	GameName string  `form:"gameName" binding:"required"`
+	TagLine  *string `form:"tagLine" binding:"required"`
 }
 
 type GetSummonerInfoResponseDto struct {
@@ -24,3 +25,17 @@ type LoadMatchesRequestDto struct {
 }
 
 type LoadMatchesResponseDto []service.MatchSummaryVO
+
+type GetIngameInfoRequestDto struct {
+	Puuid string `form:"puuid" binding:"required"`
+}
+
+type GetIngameInfoResponseDto struct {
+	GameType          string                        `json:"gameType"`
+	MapId             int64                         `json:"mapId"`
+	GameStartTime     int64                         `json:"gameStartTime"`
+	GameMode          string                        `json:"gameMode"`
+	GameQueueConfigId int64                         `json:"gameQueueConfigId"`
+	Team1             []service.IngameParticipantVO `json:"team1"`
+	Team2             []service.IngameParticipantVO `json:"team2"`
+}
