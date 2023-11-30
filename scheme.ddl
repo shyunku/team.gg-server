@@ -238,16 +238,19 @@ create index matches_game_start_timestamp_index
 
 create table summoners
 (
-    account_id      varchar(255) not null,
-    profile_icon_id int          not null,
-    revision_date   mediumtext   not null,
-    name            varchar(255) not null,
-    id              varchar(255) not null,
-    puuid           varchar(255) not null
+    account_id        varchar(255) not null,
+    profile_icon_id   int          not null,
+    revision_date     mediumtext   not null,
+    game_name         varchar(255) not null,
+    tag_line          varchar(255) not null,
+    name              varchar(255) not null,
+    id                varchar(255) not null,
+    puuid             varchar(255) not null
         primary key,
-    summoner_level  bigint       not null,
-    shorten_name    varchar(255) not null,
-    last_updated_at datetime     not null
+    summoner_level    bigint       not null,
+    shorten_game_name varchar(255) not null,
+    shorten_name      varchar(255) not null,
+    last_updated_at   datetime     not null
 );
 
 create table leagues
