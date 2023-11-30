@@ -12,7 +12,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/schollz/progressbar/v3 v3.14.1
-	github.com/shyunku-libraries/go-logger v0.1.6
+	github.com/shyunku-libraries/go-logger v0.1.7
 )
 
 require (

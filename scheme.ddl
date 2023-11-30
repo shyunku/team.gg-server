@@ -18,6 +18,12 @@ create table matches
     tournament_code      varchar(255) not null
 );
 
+create index matches_game_end_timestamp_index
+    on matches (game_end_timestamp);
+
+create index matches_game_start_timestamp_index
+    on matches (game_start_timestamp);
+
 create table match_participants
 (
     match_id                           varchar(255) not null,
@@ -87,6 +93,15 @@ create table match_participants
         foreign key (match_id) references matches (match_id)
             on update cascade on delete cascade
 );
+
+create index match_participants_match_participant_id_index
+    on match_participants (match_participant_id);
+
+create index match_participants_participant_id_index
+    on match_participants (participant_id);
+
+create index match_participants_summoner_puuid_fk
+    on match_participants (puuid);
 
 create table match_participant_details
 (
@@ -182,15 +197,6 @@ create table match_participant_perks
             on update cascade on delete cascade
 );
 
-create index match_participants_match_participant_id_index
-    on match_participants (match_participant_id);
-
-create index match_participants_participant_id_index
-    on match_participants (participant_id);
-
-create index match_participants_summoner_puuid_fk
-    on match_participants (puuid);
-
 create table match_teams
 (
     match_id          varchar(255) not null,
@@ -213,6 +219,9 @@ create table match_teams
             on update cascade on delete cascade
 );
 
+create index match_teams_team_id_index
+    on match_teams (team_id);
+
 create table match_team_bans
 (
     match_id    varchar(255) not null,
@@ -226,15 +235,6 @@ create table match_team_bans
         foreign key (match_id) references matches (match_id)
             on update cascade on delete cascade
 );
-
-create index match_teams_team_id_index
-    on match_teams (team_id);
-
-create index matches_game_end_timestamp_index
-    on matches (game_end_timestamp);
-
-create index matches_game_start_timestamp_index
-    on matches (game_start_timestamp);
 
 create table summoners
 (
