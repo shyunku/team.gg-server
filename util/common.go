@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -109,4 +110,8 @@ func StructToReadable(src interface{}) *bytes.Buffer {
 	}
 	buffer := bytes.NewBuffer(jsonData)
 	return buffer
+}
+
+func Sha256(data string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
 }

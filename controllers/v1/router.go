@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
+	"team.gg-server/controllers/v1/platform"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/service"
@@ -15,6 +16,8 @@ import (
 func UseV1Router(r *gin.Engine) {
 	g := r.Group("/v1")
 	UseIconRouter(g)
+	UseAuthRouter(g)
+	platform.UsePlatformRouter(g)
 
 	g.GET("/summoner", GetSummonerInfo)
 	g.POST("/renewSummoner", RenewSummonerInfo)

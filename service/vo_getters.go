@@ -141,3 +141,120 @@ func getSummonerMatchSummaryVOs(puuid string, matchSummaryMXDAOs []*SummonerMatc
 
 	return matchSummaryVOs, nil
 }
+
+func GetCustomGameConfigurationVOs(uid string) ([]CustomGameConfigurationSummaryVO, error) {
+	customGameConfigurationDAOs, err := models.GetCustomGameDAOs_byCreatorUid(db.Root, uid)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	customGameConfigurationVOs := make([]CustomGameConfigurationSummaryVO, 0)
+	for _, customGameConfigurationDAO := range customGameConfigurationDAOs {
+		customGameConfigurationVOs = append(customGameConfigurationVOs, CustomGameConfigurationSummaryMixer(customGameConfigurationDAO))
+	}
+
+	return customGameConfigurationVOs, nil
+}
+
+func getCustomGameCandidateVO(puuid string) (*CustomGameCandidateVO, error) {
+	summonerDao, exists, err := models.GetSummonerDAO_byPuuid(db.Root, puuid)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("summoner dao not found with puuid (%s)", puuid)
+	}
+	summonerVO := SummonerSummaryMixer(*summonerDao)
+
+	soloLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, puuid, RankTypeSolo)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if !exists {
+		return nil, nil
+	}
+	soloLeagueVO := SummonerRankMixer(*soloLeagueDAO)
+
+	flexLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, puuid, RankTypeFlex)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if !exists {
+		return nil, nil
+	}
+	flexLeagueVO := SummonerRankMixer(*flexLeagueDAO)
+
+	masteryDAO, err := models.GetMasteryDAOs(db.Root, puuid)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	masteryVOs := make([]SummonerMasteryVO, 0)
+	for _, mastery := range masteryDAO {
+		masteryVOs = append(masteryVOs, SummonerMasteryMixer(*mastery))
+	}
+
+	return &CustomGameCandidateVO{
+		summonerVO,
+		soloLeagueVO,
+		flexLeagueVO,
+		masteryVOs,
+	}, nil
+}
+
+func GetCustomGameConfigurationVO(configurationId string) (*CustomGameConfigurationVO, error) {
+	customGameConfigurationDAO, exists, err := models.GetCustomGameDAO_byId(db.Root, configurationId)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("custom game configuration dao not found with id (%s)", configurationId)
+	}
+
+	candidateVOs := make([]CustomGameCandidateVO, 0)
+	team1ParticipantsVOs := make([]CustomGameParticipantVO, 0)
+	team2ParticipantsVOs := make([]CustomGameParticipantVO, 0)
+
+	// get candidates
+	candidateDAOs, err := models.GetCustomGameCandidateDAOs_byCustomGameConfigId(db.Root, configurationId)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	for _, candidateDAO := range candidateDAOs {
+		summonerVO, err := getCustomGameCandidateVO(candidateDAO.Puuid)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		candidateVOs = append(candidateVOs, *summonerVO)
+	}
+
+	// get participants
+	participantDAOs, err := models.GetCustomGameParticipantsDAOs_byCustomGameConfigId(db.Root, configurationId)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	for _, participantDAO := range participantDAOs {
+		participantVO := CustomGameConfigurationParticipantMixer(*participantDAO)
+		if participantDAO.Team == 1 {
+			team1ParticipantsVOs = append(team1ParticipantsVOs, participantVO)
+		} else {
+			team2ParticipantsVOs = append(team2ParticipantsVOs, participantVO)
+		}
+	}
+
+	customGameConfigurationVO := CustomGameConfigurationMixer(
+		*customGameConfigurationDAO,
+		candidateVOs,
+		team1ParticipantsVOs,
+		team2ParticipantsVOs,
+	)
+	return &customGameConfigurationVO, nil
+}

@@ -239,3 +239,38 @@ type PerkStyleInfoVO struct {
 		Perks []int  `json:"perks"`
 	} `json:"defaultStatModsPerSubStyle"`
 }
+
+type CustomGameConfigurationSummaryVO struct {
+	Id            string    `json:"id"`
+	Name          string    `json:"name"`
+	LastUpdatedAt time.Time `json:"lastUpdatedAt"`
+	Fairness      float64   `json:"fairness"`
+}
+
+type CustomGameCandidateVO struct {
+	Summary  SummonerSummaryVO   `json:"summary"`
+	SoloRank SummonerRankVO      `json:"soloRank"`
+	FlexRank SummonerRankVO      `json:"flexRank"`
+	Mastery  []SummonerMasteryVO `json:"mastery"`
+}
+
+type CustomGameParticipantVO struct {
+	Position string `json:"position"`
+	Puuid    string `json:"puuid"`
+}
+
+type CustomGameConfigurationVO struct {
+	Id            string    `json:"id"`
+	Name          string    `json:"name"`
+	CreatorUid    string    `json:"creatorUid"`
+	CreatedAt     time.Time `json:"createdAt"`
+	LastUpdatedAt time.Time `json:"lastUpdatedAt"`
+	Fairness      float64   `json:"fairness"`
+	LineFairness  float64   `json:"lineFairness"`
+	TierFairness  float64   `json:"tierFairness"`
+
+	Candidates []CustomGameCandidateVO `json:"candidates"`
+
+	Team1 []CustomGameParticipantVO `json:"team1"`
+	Team2 []CustomGameParticipantVO `json:"team2"`
+}

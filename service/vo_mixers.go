@@ -134,3 +134,37 @@ func IngameParticipantMixer(d riot.SpectatorParticipantDto) IngameParticipantVO 
 		SummonerId:    d.SummonerId,
 	}
 }
+
+func CustomGameConfigurationSummaryMixer(d models.CustomGameConfigurationDAO) CustomGameConfigurationSummaryVO {
+	return CustomGameConfigurationSummaryVO{
+		Id:            d.Id,
+		Name:          d.Name,
+		LastUpdatedAt: d.LastUpdatedAt,
+		Fairness:      d.Fairness,
+	}
+}
+
+func CustomGameConfigurationParticipantMixer(d models.CustomGameParticipantDAO) CustomGameParticipantVO {
+	return CustomGameParticipantVO{
+		Position: d.Position,
+		Puuid:    d.Puuid,
+	}
+}
+
+func CustomGameConfigurationMixer(d models.CustomGameConfigurationDAO,
+	candidates []CustomGameCandidateVO,
+	team1, team2 []CustomGameParticipantVO) CustomGameConfigurationVO {
+	return CustomGameConfigurationVO{
+		Id:            d.Id,
+		Name:          d.Name,
+		CreatorUid:    d.CreatorUid,
+		CreatedAt:     d.CreatedAt,
+		LastUpdatedAt: d.LastUpdatedAt,
+		Fairness:      d.Fairness,
+		LineFairness:  d.LineFairness,
+		TierFairness:  d.TierFairness,
+		Candidates:    candidates,
+		Team1:         team1,
+		Team2:         team2,
+	}
+}

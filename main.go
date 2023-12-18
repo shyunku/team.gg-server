@@ -8,6 +8,7 @@ import (
 	"os"
 	"team.gg-server/controllers"
 	"team.gg-server/core"
+	"team.gg-server/libs/crypto"
 	"team.gg-server/libs/db"
 	"team.gg-server/service"
 	"team.gg-server/third_party/riot"
@@ -90,6 +91,10 @@ func main() {
 	// Init 3rd party services
 	log.Info("Initializing 3rd party services...")
 	riot.Init()
+
+	// Init jwt secret key
+	log.Info("Initializing jwt secret key...")
+	crypto.Initialize()
 
 	// randomize seed
 	rand.Seed(time.Now().UnixNano())

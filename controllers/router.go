@@ -24,7 +24,19 @@ func SetupRouter() *gin.Engine {
 
 	// setting cors
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"*"}
+	config.AllowOrigins = []string{
+		"http://localhost:8080",
+	}
+	config.AllowCredentials = true
+	config.AllowHeaders = []string{
+		"Origin",
+		"Content-Length",
+		"Content-Type",
+		"Access-Control-Allow-Origin",
+		"Access-Control-Allow-Headers",
+		"Access-Control-Allow-Credentials",
+		"Authorization",
+	}
 
 	r := gin.Default()
 	r.Use(cors.New(config))

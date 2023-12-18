@@ -2,6 +2,21 @@ package v1
 
 import "team.gg-server/service"
 
+type LoginRequestDto struct {
+	UserId            string `json:"userId" binding:"required"`
+	EncryptedPassword string `json:"encryptedPassword" binding:"required"`
+}
+
+type LoginResponseDto struct {
+	Uid    string `json:"uid"`
+	UserId string `json:"userId"`
+}
+
+type SignupRequestDto struct {
+	UserId            string `json:"userId" binding:"required"`
+	EncryptedPassword string `json:"encryptedPassword" binding:"required"`
+}
+
 type GetSummonerInfoRequestDto struct {
 	GameName string  `form:"gameName" binding:"required"`
 	TagLine  *string `form:"tagLine" binding:"required"`

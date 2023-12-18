@@ -10,6 +10,12 @@ const (
 	LoadInitialMatchCount = 10
 	LoadMoreMatchCount    = 5
 
+	PositionTop     = "TOP"
+	PositionJungle  = "JUNGLE"
+	PositionMid     = "MID"
+	PositionAdc     = "ADC"
+	PositionSupport = "SUPPORT"
+
 	MatchDecoTypeFirstBloodKill     = "FIRST_BLOOD"
 	MatchDecoTypeHighestDamage      = "HIGHEST_DAMAGE"
 	MatchDecoTypeHighestDamageTaken = "HIGHEST_DAMAGE_TAKEN"
