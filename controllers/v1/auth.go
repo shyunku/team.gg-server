@@ -9,6 +9,7 @@ import (
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/util"
+	"time"
 )
 
 func UseAuthRouter(r *gin.RouterGroup) {
@@ -17,7 +18,6 @@ func UseAuthRouter(r *gin.RouterGroup) {
 	g.POST("/login", Login)
 	g.POST("/signup", Signup)
 	g.POST("/logout", Logout)
-	g.GET("/isAuthorized", IsAuthorized)
 }
 
 func Login(c *gin.Context) {
@@ -55,14 +55,16 @@ func Login(c *gin.Context) {
 	}
 
 	// save on cookie
-	accessTokenExpireDuration, err := auth.GetAccessTokenExpireDuration()
+	refreshTokenExpireDuration, err := auth.GetRefreshTokenExpireDuration()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(accessTokenExpireDuration.Seconds()),
+	accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
+	log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), userDAO.UserId)
+	c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
 		"/", "", false, true)
 
 	resp := LoginResponseDto{
@@ -115,23 +117,5 @@ func Signup(c *gin.Context) {
 
 func Logout(c *gin.Context) { // delete cookie
 	c.SetCookie("accessToken", "", -1, "/", "", false, true)
-	c.JSON(http.StatusOK, nil)
-}
-
-func IsAuthorized(c *gin.Context) {
-	// with cookie
-	accessToken, err := c.Cookie("access_token")
-	if err != nil {
-		util.AbortWithStrJson(c, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-
-	// check if token is valid
-	_, err = auth.ValidateToken(accessToken)
-	if err != nil {
-		util.AbortWithStrJson(c, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-
 	c.JSON(http.StatusOK, nil)
 }

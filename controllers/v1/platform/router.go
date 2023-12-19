@@ -9,4 +9,12 @@ func UsePlatformRouter(r *gin.RouterGroup) {
 	g := r.Group("/platform")
 	g.Use(middlewares.AuthMiddleware)
 	UseCustomGameRouter(g)
+
+	g.GET("/tokenTest", TestToken)
+}
+
+func TestToken(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"message": "still alive",
+	})
 }

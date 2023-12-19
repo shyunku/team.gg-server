@@ -20,14 +20,19 @@ func SummonerSummaryMixer(d models.SummonerDAO) SummonerSummaryVO {
 	}
 }
 
-func SummonerRankMixer(d models.LeagueDAO) SummonerRankVO {
-	return SummonerRankVO{
-		Tier:   d.Tier,
-		Rank:   d.Rank,
-		Lp:     d.LeaguePoints,
-		Wins:   d.Wins,
-		Losses: d.Losses,
+func SummonerRankMixer(d models.LeagueDAO) (*SummonerRankVO, error) {
+	ratingPoint, err := CalculateRatingPoint(d.Tier, d.Rank, d.LeaguePoints)
+	if err != nil {
+		return nil, err
 	}
+	return &SummonerRankVO{
+		Tier:        d.Tier,
+		Rank:        d.Rank,
+		Lp:          d.LeaguePoints,
+		Wins:        d.Wins,
+		Losses:      d.Losses,
+		RatingPoint: ratingPoint,
+	}, nil
 }
 
 func SummonerMasteryMixer(d models.MasteryDAO) SummonerMasteryVO {

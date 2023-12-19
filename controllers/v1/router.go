@@ -68,17 +68,6 @@ func GetSummonerInfo(c *gin.Context) {
 			return
 		}
 
-		//summoner, status, err := riot.GetSummonerByName(req.SummonerName)
-		//if err != nil {
-		//	if status == http.StatusNotFound {
-		//		util.AbortWithStrJson(c, http.StatusNotFound, "invalid summoner name")
-		//		return
-		//	}
-		//	log.Error(err)
-		//	util.AbortWithStrJson(c, http.StatusBadRequest, "internal server error")
-		//	return
-		//}
-
 		if err := service.RenewSummonerTotal(tx, account.Puuid); err != nil {
 			log.Error(err)
 			_ = tx.Rollback()

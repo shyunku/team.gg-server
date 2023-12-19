@@ -102,6 +102,10 @@ func GetPublicIp() (string, error) {
 	return ipv4, nil
 }
 
+func StdFormatTime(t time.Time) string {
+	return t.Format("2006-01-02 15:04:05")
+}
+
 func StructToReadable(src interface{}) *bytes.Buffer {
 	jsonData, err := json.Marshal(src)
 	if err != nil {

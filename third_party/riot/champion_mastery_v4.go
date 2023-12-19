@@ -20,10 +20,10 @@ type MasteryItemDto struct {
 
 type MasteryDto []MasteryItemDto
 
-func GetMasteryBySummonerId(summonerId string) (*MasteryDto, error) {
+func GetMasteryByPuuid(puuid string) (*MasteryDto, error) {
 	incrementApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionKr, "/lol/champion-mastery/v4/champion-masteries/by-summoner/"+summonerId),
+		Url: CreateUrl(RegionKr, "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+puuid),
 	})
 	if err != nil {
 		return nil, err

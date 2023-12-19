@@ -48,8 +48,12 @@ func GetSummonerRankVO(puuid string, rankType string) (*SummonerRankVO, error) {
 	if !exists {
 		return nil, nil
 	}
-	leagueVo := SummonerRankMixer(*leagueDAO)
-	return &leagueVo, nil
+	leagueVo, err := SummonerRankMixer(*leagueDAO)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return leagueVo, nil
 }
 
 func GetSummonerMasteryVOs(puuid string) ([]SummonerMasteryVO, error) {
@@ -157,38 +161,72 @@ func GetCustomGameConfigurationVOs(uid string) ([]CustomGameConfigurationSummary
 	return customGameConfigurationVOs, nil
 }
 
-func getCustomGameCandidateVO(puuid string) (*CustomGameCandidateVO, error) {
-	summonerDao, exists, err := models.GetSummonerDAO_byPuuid(db.Root, puuid)
+func GetCustomGameCandidateVO(candidateDAO models.CustomGameCandidateDAO) (*CustomGameCandidateVO, error) {
+	summonerDao, exists, err := models.GetSummonerDAO_byPuuid(db.Root, candidateDAO.Puuid)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 	if !exists {
-		return nil, fmt.Errorf("summoner dao not found with puuid (%s)", puuid)
+		return nil, fmt.Errorf("summoner dao not found with puuid (%s)", candidateDAO.Puuid)
 	}
 	summonerVO := SummonerSummaryMixer(*summonerDao)
 
-	soloLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, puuid, RankTypeSolo)
+	var soloLeagueVO *SummonerRankVO
+	soloLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, candidateDAO.Puuid, RankTypeSolo)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	if !exists {
-		return nil, nil
+	if exists {
+		soloLeagueVO, err = SummonerRankMixer(*soloLeagueDAO)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
 	}
-	soloLeagueVO := SummonerRankMixer(*soloLeagueDAO)
 
-	flexLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, puuid, RankTypeFlex)
+	var flexLeagueVO *SummonerRankVO
+	flexLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, candidateDAO.Puuid, RankTypeFlex)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	if !exists {
-		return nil, nil
+	if exists {
+		flexLeagueVO, err = SummonerRankMixer(*flexLeagueDAO)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
 	}
-	flexLeagueVO := SummonerRankMixer(*flexLeagueDAO)
 
-	masteryDAO, err := models.GetMasteryDAOs(db.Root, puuid)
+	var customRankVO *SummonerRankVO
+	if candidateDAO.CustomTier != nil && candidateDAO.CustomRank != nil {
+		customRankVO = &SummonerRankVO{
+			Tier:   *candidateDAO.CustomTier,
+			Rank:   *candidateDAO.CustomRank,
+			Lp:     0,
+			Wins:   0,
+			Losses: 0,
+		}
+		ratingPoint, err := CalculateRatingPoint(*candidateDAO.CustomTier, *candidateDAO.CustomRank, 0)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+
+		customRankVO.RatingPoint = ratingPoint
+	}
+
+	positionFavorVO := CustomGameCandidatePositionFavorVO{
+		Top:     candidateDAO.FlavorTop,
+		Jungle:  candidateDAO.FlavorJungle,
+		Mid:     candidateDAO.FlavorMid,
+		Adc:     candidateDAO.FlavorAdc,
+		Support: candidateDAO.FlavorSupport,
+	}
+
+	masteryDAO, err := models.GetMasteryDAOs(db.Root, candidateDAO.Puuid)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -199,10 +237,12 @@ func getCustomGameCandidateVO(puuid string) (*CustomGameCandidateVO, error) {
 	}
 
 	return &CustomGameCandidateVO{
-		summonerVO,
-		soloLeagueVO,
-		flexLeagueVO,
-		masteryVOs,
+		Summary:       summonerVO,
+		SoloRank:      soloLeagueVO,
+		FlexRank:      flexLeagueVO,
+		CustomRank:    customRankVO,
+		PositionFavor: positionFavorVO,
+		Mastery:       masteryVOs,
 	}, nil
 }
 
@@ -227,7 +267,7 @@ func GetCustomGameConfigurationVO(configurationId string) (*CustomGameConfigurat
 		return nil, err
 	}
 	for _, candidateDAO := range candidateDAOs {
-		summonerVO, err := getCustomGameCandidateVO(candidateDAO.Puuid)
+		summonerVO, err := GetCustomGameCandidateVO(candidateDAO)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -236,7 +276,7 @@ func GetCustomGameConfigurationVO(configurationId string) (*CustomGameConfigurat
 	}
 
 	// get participants
-	participantDAOs, err := models.GetCustomGameParticipantsDAOs_byCustomGameConfigId(db.Root, configurationId)
+	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(db.Root, configurationId)
 	if err != nil {
 		log.Error(err)
 		return nil, err

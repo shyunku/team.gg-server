@@ -144,7 +144,7 @@ func RenewSummonerLeague(db db.Context, summonerId string, puuid string) error {
 }
 
 func RenewSummonerMastery(db db.Context, summonerId string, puuid string) error {
-	masteries, err := riot.GetMasteryBySummonerId(summonerId)
+	masteries, err := riot.GetMasteryByPuuid(puuid)
 	if err != nil {
 		log.Warnf("failed to get mastery by summoner id (%s)", summonerId)
 		return err

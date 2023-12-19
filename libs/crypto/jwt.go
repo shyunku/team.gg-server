@@ -8,11 +8,13 @@ import (
 )
 
 var (
-	JwtSecretKey = ""
+	JwtAccessSecretKey  = ""
+	JwtRefreshSecretKey = ""
 )
 
 func Initialize() {
-	JwtSecretKey = os.Getenv("JWT_ACCESS_SECRET")
+	JwtAccessSecretKey = os.Getenv("JWT_ACCESS_SECRET")
+	JwtRefreshSecretKey = os.Getenv("JWT_REFRESH_SECRET")
 }
 
 func generateJWTSecretKey(length int) string {

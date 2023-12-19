@@ -50,7 +50,7 @@ func CreateAuthToken(uid string) (*AuthTokenBundle, error) {
 	}
 
 	// load jwt secret from env
-	jwtAccessSecretKey := crypto.JwtSecretKey
+	jwtAccessSecretKey := crypto.JwtAccessSecretKey
 	jwtRefreshSecretKey := os.Getenv("JWT_REFRESH_SECRET")
 
 	jwtAccessExpireTime, err := GetAccessTokenExpireDuration()
@@ -88,28 +88,35 @@ func CreateAuthToken(uid string) (*AuthTokenBundle, error) {
 	return atd, nil
 }
 
-func ValidateToken(rawToken string) (string, error) {
-	// check if token is valid
-	token, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(crypto.JwtSecretKey), nil
-	})
+func ValidateToken(rawToken string, secret string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
 	if err != nil {
 		return "", err
 	}
 
-	// check if token is expired
-	cliams, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		// token expired
-		return "", errors.New("token expired or invalid")
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("cannot parse claims")
 	}
 
-	userId := cliams["uid"].(string)
-	if len(userId) == 0 {
-		return "", errors.New("uid empty")
+	userId, ok := claims["uid"].(string)
+	if !ok || len(userId) == 0 {
+		return "", errors.New("uid is empty or invalid")
+	}
+
+	_, err = jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
+	if err != nil {
+		var ve *jwt.ValidationError
+		ok := errors.As(err, &ve)
+		if ok && ve.Errors == jwt.ValidationErrorExpired {
+			return userId, ve
+		}
+		return "", err
 	}
 
 	return userId, nil
@@ -119,7 +126,22 @@ func SaveRefreshToken(uid string, refreshToken authToken) error {
 	refreshTokenExpiresUnix := time.Unix(refreshToken.ExpiresAt, 0)
 	now := time.Now()
 
-	if err := db.InMemoryDB.SetExp(refreshToken.Token, uid, refreshTokenExpiresUnix.Sub(now)); err != nil {
+	if err := db.InMemoryDB.SetExp(uid, refreshToken.Token, refreshTokenExpiresUnix.Sub(now)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LoadRefreshToken(uid string) (string, error) {
+	refreshToken, err := db.InMemoryDB.Get(uid)
+	if err != nil {
+		return "", err
+	}
+	return refreshToken, nil
+}
+
+func DeleteRefreshToken(uid string) error {
+	if err := db.InMemoryDB.Del(uid); err != nil {
 		return err
 	}
 	return nil

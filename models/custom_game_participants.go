@@ -1,6 +1,10 @@
 package models
 
-import "team.gg-server/libs/db"
+import (
+	"database/sql"
+	"errors"
+	"team.gg-server/libs/db"
+)
 
 type CustomGameParticipantDAO struct {
 	CustomGameConfigId string `db:"custom_game_config_id" json:"customGameConfigId"`
@@ -24,10 +28,31 @@ func (s *CustomGameParticipantDAO) Upsert(db db.Context) error {
 	return nil
 }
 
-func GetCustomGameParticipantsDAOs_byCustomGameConfigId(db db.Context, customGameConfigId string) ([]*CustomGameParticipantDAO, error) {
+func GetCustomGameParticipantDAOs_byCustomGameConfigId(db db.Context, customGameConfigId string) ([]*CustomGameParticipantDAO, error) {
 	var customGameParticipants []*CustomGameParticipantDAO
 	if err := db.Select(&customGameParticipants, "SELECT * FROM custom_game_participants WHERE custom_game_config_id = ?", customGameConfigId); err != nil {
 		return nil, err
 	}
 	return customGameParticipants, nil
+}
+func GetCustomGameParticipantDAO_byPosition(db db.Context, customGameConfigId string, team int, position string) (*CustomGameParticipantDAO, bool, error) {
+	var customGameParticipant CustomGameParticipantDAO
+	if err := db.Get(&customGameParticipant, `
+		SELECT * FROM custom_game_participants 
+		WHERE custom_game_config_id = ? AND team = ? AND position = ?`, customGameConfigId, team, position); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return &customGameParticipant, true, nil
+}
+
+func DeleteCustomGameParticipantDAO_byCustomGameConfigId(db db.Context, customGameConfigId, puuid string) error {
+	if _, err := db.Exec(`
+		DELETE FROM custom_game_participants 
+		WHERE custom_game_config_id = ? AND puuid = ?`, customGameConfigId, puuid); err != nil {
+		return err
+	}
+	return nil
 }

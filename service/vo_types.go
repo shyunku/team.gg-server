@@ -15,11 +15,12 @@ type SummonerSummaryVO struct {
 }
 
 type SummonerRankVO struct {
-	Tier   string `json:"tier"`
-	Rank   string `json:"rank"`
-	Lp     int    `json:"lp"`
-	Wins   int    `json:"wins"`
-	Losses int    `json:"losses"`
+	Tier        string `json:"tier"`
+	Rank        string `json:"rank"`
+	Lp          int    `json:"lp"`
+	Wins        int    `json:"wins"`
+	Losses      int    `json:"losses"`
+	RatingPoint int64  `json:"ratingPoint"`
 }
 
 type SummonerMasteryVO struct {
@@ -247,11 +248,21 @@ type CustomGameConfigurationSummaryVO struct {
 	Fairness      float64   `json:"fairness"`
 }
 
+type CustomGameCandidatePositionFavorVO struct {
+	Top     bool `json:"top"`
+	Jungle  bool `json:"jungle"`
+	Mid     bool `json:"mid"`
+	Adc     bool `json:"adc"`
+	Support bool `json:"support"`
+}
+
 type CustomGameCandidateVO struct {
-	Summary  SummonerSummaryVO   `json:"summary"`
-	SoloRank SummonerRankVO      `json:"soloRank"`
-	FlexRank SummonerRankVO      `json:"flexRank"`
-	Mastery  []SummonerMasteryVO `json:"mastery"`
+	Summary       SummonerSummaryVO                  `json:"summary"`
+	SoloRank      *SummonerRankVO                    `json:"soloRank"`
+	FlexRank      *SummonerRankVO                    `json:"flexRank"`
+	CustomRank    *SummonerRankVO                    `json:"customRank"`
+	PositionFavor CustomGameCandidatePositionFavorVO `json:"positionFavor"`
+	Mastery       []SummonerMasteryVO                `json:"mastery"`
 }
 
 type CustomGameParticipantVO struct {
