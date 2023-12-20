@@ -35,6 +35,7 @@ func GetCustomGameParticipantDAOs_byCustomGameConfigId(db db.Context, customGame
 	}
 	return customGameParticipants, nil
 }
+
 func GetCustomGameParticipantDAO_byPosition(db db.Context, customGameConfigId string, team int, position string) (*CustomGameParticipantDAO, bool, error) {
 	var customGameParticipant CustomGameParticipantDAO
 	if err := db.Get(&customGameParticipant, `
@@ -48,7 +49,20 @@ func GetCustomGameParticipantDAO_byPosition(db db.Context, customGameConfigId st
 	return &customGameParticipant, true, nil
 }
 
-func DeleteCustomGameParticipantDAO_byCustomGameConfigId(db db.Context, customGameConfigId, puuid string) error {
+func GetCustomGameParticipantDAO_byPuuid(db db.Context, customGameConfigId, puuid string) (*CustomGameParticipantDAO, bool, error) {
+	var customGameParticipant CustomGameParticipantDAO
+	if err := db.Get(&customGameParticipant, `
+		SELECT * FROM custom_game_participants 
+		WHERE custom_game_config_id = ? AND puuid = ?`, customGameConfigId, puuid); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return &customGameParticipant, true, nil
+}
+
+func DeleteCustomGameParticipantDAO_byPuuid(db db.Context, customGameConfigId, puuid string) error {
 	if _, err := db.Exec(`
 		DELETE FROM custom_game_participants 
 		WHERE custom_game_config_id = ? AND puuid = ?`, customGameConfigId, puuid); err != nil {

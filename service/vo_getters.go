@@ -298,3 +298,17 @@ func GetCustomGameConfigurationVO(configurationId string) (*CustomGameConfigurat
 	)
 	return &customGameConfigurationVO, nil
 }
+
+func GetCustomGameConfigurationBalanceVO(customGameConfigId string) (*CustomGameConfigurationBalanceVO, error) {
+	customGameConfigDAO, exists, err := models.GetCustomGameDAO_byId(db.Root, customGameConfigId)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("custom game config dao not found with id (%s)", customGameConfigId)
+	}
+
+	fairnessVO := CustomGameConfigurationFairnessMixer(*customGameConfigDAO)
+	return &fairnessVO, nil
+}

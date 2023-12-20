@@ -22,6 +22,9 @@ const (
 
 	TierHighUnderBound = TierMaster
 
+	TierHighGrandmasterUnderBound = 650
+	TierHighChallengerUnderBound  = 900
+
 	RankI   = "I"
 	RankII  = "II"
 	RankIII = "III"
@@ -32,6 +35,7 @@ const (
 
 type Tier string
 type Rank string
+type LeaguePoint int64
 
 var (
 	TierRankMap = map[Tier][]Rank{
@@ -53,6 +57,9 @@ var (
 
 		tierKeys := make([]Tier, 0)
 		for tier, _ := range TierRankMap {
+			if tier == TierUnranked {
+				continue
+			}
 			tierKeys = append(tierKeys, tier)
 		}
 
@@ -78,6 +85,7 @@ var (
 				ratingPoint += RankUnitRatingPoint
 			}
 		}
+		//log.Debug(m)
 		return m
 	}()
 	//test = func() error {
@@ -90,6 +98,22 @@ var (
 	//			}
 	//			log.Debugf("tier: %s, rank: %s, ratingPoint: %d", tier, rank, ratingPoint)
 	//		}
+	//	}
+	//	return nil
+	//}()
+	//test2 = func() error {
+	//	i := 0
+	//	for {
+	//		if i > 5000 {
+	//			break
+	//		}
+	//		i += 30
+	//		tier, rank, lp, err := CalculateTierRank(int64(i))
+	//		if err != nil {
+	//			log.Fatal(err)
+	//			os.Exit(-1)
+	//		}
+	//		log.Debugf("ratingPoint: %d, tier: %s, rank: %s, lp: %d", i, tier, rank, lp)
 	//	}
 	//	return nil
 	//}()
@@ -129,6 +153,61 @@ func CalculateRatingPoint(tier, rank string, lp int) (int64, error) {
 	}
 
 	return ratingPoint, nil
+}
+
+func CalculateTierRank(ratingPointRaw float64) (Tier, Rank, LeaguePoint, error) {
+	var tier Tier = TierIron
+	var rank Rank
+	var lp LeaguePoint
+
+	ratingPoint := int64(ratingPointRaw)
+
+	if ratingPoint < 0 {
+		return "", "", 0, fmt.Errorf("invalid rating point: %d", ratingPoint)
+	}
+
+	highTierUnderBoundBaseRatingPoint, ok := TierBaseRatingPointMap[TierHighUnderBound]
+	if !ok {
+		return "", "", 0, fmt.Errorf("invalid tier: %s", tier)
+	}
+
+	if ratingPoint < highTierUnderBoundBaseRatingPoint {
+		var highestTierBase int64 = 0
+		for tierKey, tierBase := range TierBaseRatingPointMap {
+			if ratingPoint >= TierBaseRatingPointMap[tierKey] {
+				if tierBase > highestTierBase {
+					highestTierBase = tierBase
+					tier = tierKey
+				}
+			}
+		}
+
+		remainingLp := ratingPoint - highestTierBase
+		//log.Debugf("tierBase: %s, highestTierBase: %d, remainingLp: %d", tier, highestTierBase, remainingLp)
+		rankLevel := int(remainingLp / RankUnitRatingPoint)
+		ranks, ok := TierRankMap[tier]
+		if !ok {
+			return "", "", 0, fmt.Errorf("invalid tier: %s", tier)
+		}
+		rank = ranks[len(ranks)-rankLevel-1]
+		lp = LeaguePoint(remainingLp % RankUnitRatingPoint)
+	} else {
+		// high tier
+		remainingLp := ratingPoint - highTierUnderBoundBaseRatingPoint
+		if remainingLp < TierHighGrandmasterUnderBound {
+			tier = TierMaster
+			rank = RankI
+		} else if remainingLp < TierHighChallengerUnderBound {
+			tier = TierGrandmaster
+			rank = RankI
+		} else {
+			tier = TierChallenger
+			rank = RankI
+		}
+		lp = LeaguePoint(remainingLp)
+	}
+
+	return tier, rank, lp, nil
 }
 
 func GetTierLevel(tier Tier) (int, error) {

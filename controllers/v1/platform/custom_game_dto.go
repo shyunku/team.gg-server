@@ -10,6 +10,22 @@ type GetCustomGameConfigurationRequestDto struct {
 
 type GetCustomGameConfigurationResponseDto service.CustomGameConfigurationVO
 
+type GetTierRankRequestDto struct {
+	RatingPoint *float64 `form:"ratingPoint" binding:"required"`
+}
+
+type GetTierRankResponseDto struct {
+	Tier string `json:"tier"`
+	Rank string `json:"rank"`
+	Lp   int64  `json:"lp"`
+}
+
+type GetCustomConfigurationBalanceRequestDto struct {
+	Id string `form:"id" binding:"required"`
+}
+
+type GetCustomConfigurationSummaryResponseDto service.CustomGameConfigurationSummaryVO
+
 type AddCandidateToCustomGameRequestDto struct {
 	CustomGameConfigId string `json:"customGameConfigId" binding:"required"`
 	Name               string `json:"name" binding:"required"`
@@ -25,9 +41,14 @@ type ArrangeCustomGameParticipantRequestDto struct {
 	TargetPosition     string `json:"targetPosition" binding:"required"`
 }
 
+type UnarrangeCustomGameParticipantRequestDto struct {
+	CustomGameConfigId string `json:"customGameConfigId" binding:"required"`
+	Puuid              string `json:"puuid" binding:"required"`
+}
+
 type SetCustomGameParticipantFavorPositionRequestDto struct {
 	CustomGameConfigId string `json:"customGameConfigId" binding:"required"`
 	Puuid              string `json:"puuid" binding:"required"`
 	FavorPosition      string `json:"favorPosition" binding:"required"`
-	Enabled            *bool  `json:"enabled" binding:"required"`
+	Strength           *int   `json:"strength" binding:"required"`
 }

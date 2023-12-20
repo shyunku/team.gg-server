@@ -21,8 +21,11 @@ func UseCustomGameRouter(r *gin.RouterGroup) {
 	g.GET("/info", GetCustomGameConfiguration)
 	g.POST("/create", CreateCustomGameConfiguration)
 
+	g.GET("/tier-rank", GetTierRank)
+	g.GET("/balance", GetCustomConfigurationBalance)
 	g.PUT("/candidate", AddCandidateToCustomGameConfiguration)
 	g.POST("/arrange", ArrangeCustomGameParticipant)
+	g.POST("/unarrange", UnarrangeCustomGameParticipant)
 	g.POST("/favor-position", SetCustomGameParticipantFavorPosition)
 }
 
@@ -98,6 +101,51 @@ func CreateCustomGameConfiguration(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, newId)
+}
+
+func GetTierRank(c *gin.Context) {
+	var req GetTierRankRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if req.RatingPoint == nil {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid rating point")
+		return
+	}
+
+	tier, rank, lp, err := service.CalculateTierRank(*req.RatingPoint)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, GetTierRankResponseDto{
+		Tier: string(tier),
+		Rank: string(rank),
+		Lp:   int64(lp),
+	})
+}
+
+func GetCustomConfigurationBalance(c *gin.Context) {
+	var req GetCustomConfigurationBalanceRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	resp, err := service.GetCustomGameConfigurationBalanceVO(req.Id)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func AddCandidateToCustomGameConfiguration(c *gin.Context) {
@@ -202,11 +250,11 @@ func AddCandidateToCustomGameConfiguration(c *gin.Context) {
 		Puuid:              summonerDAO.Puuid,
 		CustomTier:         nil,
 		CustomRank:         nil,
-		FlavorTop:          false,
-		FlavorJungle:       false,
-		FlavorMid:          false,
-		FlavorAdc:          false,
-		FlavorSupport:      false,
+		FlavorTop:          0,
+		FlavorJungle:       0,
+		FlavorMid:          0,
+		FlavorAdc:          0,
+		FlavorSupport:      0,
 	}
 	if err := newCandidateDAO.Upsert(db.Root); err != nil {
 		log.Error(err)
@@ -286,8 +334,8 @@ func ArrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
-	// check if candidate exists in same place
-	participantDAO, exists, err := models.GetCustomGameParticipantDAO_byPosition(tx, req.CustomGameConfigId, req.Team, req.TargetPosition)
+	// check if candidate exists as participants
+	srcParticipantDAO, moveFromParticipant, err := models.GetCustomGameParticipantDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid)
 	if err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
@@ -295,9 +343,56 @@ func ArrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
+	// check if candidate exists in same place
+	destParticipantDAO, exists, err := models.GetCustomGameParticipantDAO_byPosition(tx, req.CustomGameConfigId, req.Team, req.TargetPosition)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
 	if exists {
 		// delete participant
-		if err := models.DeleteCustomGameParticipantDAO_byCustomGameConfigId(tx, req.CustomGameConfigId, participantDAO.Puuid); err != nil {
+		if err := models.DeleteCustomGameParticipantDAO_byPuuid(tx, req.CustomGameConfigId, destParticipantDAO.Puuid); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		if moveFromParticipant {
+			// src.participant -> dest.participant (swap)
+			destParticipantDAO.Team = srcParticipantDAO.Team
+			destParticipantDAO.Position = srcParticipantDAO.Position
+			if err := destParticipantDAO.Upsert(tx); err != nil {
+				log.Error(err)
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+				return
+			}
+		}
+	}
+
+	if moveFromParticipant {
+		// participant -> participant
+		srcParticipantDAO.Team = req.Team
+		srcParticipantDAO.Position = req.TargetPosition
+		if err := srcParticipantDAO.Upsert(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	} else {
+		// candidate -> participant
+		// add participant
+		newParticipantDAO := models.CustomGameParticipantDAO{
+			CustomGameConfigId: req.CustomGameConfigId,
+			Puuid:              req.Puuid,
+			Team:               req.Team,
+			Position:           req.TargetPosition,
+		}
+		if err := newParticipantDAO.Upsert(tx); err != nil {
 			log.Error(err)
 			_ = tx.Rollback()
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -305,14 +400,7 @@ func ArrangeCustomGameParticipant(c *gin.Context) {
 		}
 	}
 
-	// add participant
-	newParticipantDAO := models.CustomGameParticipantDAO{
-		CustomGameConfigId: req.CustomGameConfigId,
-		Puuid:              req.Puuid,
-		Team:               req.Team,
-		Position:           req.TargetPosition,
-	}
-	if err := newParticipantDAO.Upsert(tx); err != nil {
+	if err := service.RecalculateCustomGameBalance(tx, req.CustomGameConfigId); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -326,7 +414,46 @@ func ArrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, "ok")
+	c.JSON(http.StatusOK, nil)
+}
+
+func UnarrangeCustomGameParticipant(c *gin.Context) {
+	var req UnarrangeCustomGameParticipantRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	customGameConfigurationDAO, exists, err := models.GetCustomGameDAO_byId(db.Root, req.CustomGameConfigId)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		util.AbortWithStrJson(c, http.StatusNotFound, "custom game configuration not found")
+		return
+	}
+	if customGameConfigurationDAO.CreatorUid != uid {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	if err := service.RecalculateCustomGameBalance(db.Root, req.CustomGameConfigId); err != nil {
+		log.Error(err)
+	}
+
+	if err := models.DeleteCustomGameParticipantDAO_byPuuid(db.Root, req.CustomGameConfigId, req.Puuid); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, nil)
 }
 
 func SetCustomGameParticipantFavorPosition(c *gin.Context) {
@@ -376,23 +503,29 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 		return
 	}
 
-	if req.Enabled == nil {
+	if req.Strength == nil {
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid enabled")
 		return
 	}
 
+	if *req.Strength < 0 || *req.Strength > 2 {
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid strength")
+		return
+	}
+
 	// update candidate
 	if req.FavorPosition == service.PositionTop {
-		candidateDAO.FlavorTop = *req.Enabled
+		candidateDAO.FlavorTop = *req.Strength
 	} else if req.FavorPosition == service.PositionJungle {
-		candidateDAO.FlavorJungle = *req.Enabled
+		candidateDAO.FlavorJungle = *req.Strength
 	} else if req.FavorPosition == service.PositionMid {
-		candidateDAO.FlavorMid = *req.Enabled
+		candidateDAO.FlavorMid = *req.Strength
 	} else if req.FavorPosition == service.PositionAdc {
-		candidateDAO.FlavorAdc = *req.Enabled
+		candidateDAO.FlavorAdc = *req.Strength
 	} else if req.FavorPosition == service.PositionSupport {
-		candidateDAO.FlavorSupport = *req.Enabled
+		candidateDAO.FlavorSupport = *req.Strength
 	} else {
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid target position")
@@ -400,6 +533,13 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 	}
 
 	if err := candidateDAO.Upsert(tx); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.CustomGameConfigId); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")

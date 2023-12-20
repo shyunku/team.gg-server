@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	log "github.com/shyunku-libraries/go-logger"
+	"math"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/third_party/riot"
@@ -492,3 +493,181 @@ func RenewSummonerMatchIfNecessary(db db.Context, puuid string, matchId string) 
 
 	return nil
 }
+
+func RecalculateCustomGameBalance(db db.Context, configId string) error {
+	// get custom game config
+	configDAO, exists, err := models.GetCustomGameDAO_byId(db, configId)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("custom game config (%s) doesn't exist", configId)
+	}
+
+	// get custom game candidates
+	candidateDAOs, err := models.GetCustomGameCandidateDAOs_byCustomGameConfigId(db, configId)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	candidatesMap := make(map[string]models.CustomGameCandidateDAO)
+	for _, candidateDAO := range candidateDAOs {
+		candidatesMap[candidateDAO.Puuid] = candidateDAO
+	}
+
+	// get custom game participants
+	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(db, configId)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	type Participant struct {
+		CustomGameCandidateVO
+		Team     int
+		Position string
+	}
+
+	participantVOsMap := make(map[string]Participant)
+	for _, participantDAO := range participantDAOs {
+		candidateDAO := candidatesMap[participantDAO.Puuid]
+		candidateVO, err := GetCustomGameCandidateVO(candidateDAO)
+		if err != nil {
+			return err
+		}
+		participantVOsMap[participantDAO.Puuid] = Participant{
+			CustomGameCandidateVO: *candidateVO,
+			Team:                  participantDAO.Team,
+			Position:              participantDAO.Position,
+		}
+	}
+
+	// calculate line score
+	var team1LineScore float64 = 0
+	var team2LineScore float64 = 0
+
+	// calculate each line score
+	var team1TopScore float64 = 0
+	var team1JungleScore float64 = 0
+	var team1MidScore float64 = 0
+	var team1AdcScore float64 = 0
+	var team1SupportScore float64 = 0
+	var team2TopScore float64 = 0
+	var team2JungleScore float64 = 0
+	var team2MidScore float64 = 0
+	var team2AdcScore float64 = 0
+	var team2SupportScore float64 = 0
+
+	for _, participant := range participantVOsMap {
+		log.Debugf("team %d - %s: %s", participant.Team, participant.Position, participant.Summary.GameName)
+		var score float64 = 0
+		switch participant.Position {
+		case PositionTop:
+			score = float64(participant.PositionFavor.Top+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionTopEffectiveness
+			if participant.Team == 1 {
+				team1TopScore = score
+			} else {
+				team2TopScore = score
+			}
+		case PositionJungle:
+			score = float64(participant.PositionFavor.Jungle+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionJungleEffectiveness
+			if participant.Team == 1 {
+				team1JungleScore = score
+			} else {
+				team2JungleScore = score
+			}
+		case PositionMid:
+			score = float64(participant.PositionFavor.Mid+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionMidEffectiveness
+			if participant.Team == 1 {
+				team1MidScore = score
+			} else {
+				team2MidScore = score
+			}
+		case PositionAdc:
+			score = float64(participant.PositionFavor.Adc+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionAdcEffectiveness
+			if participant.Team == 1 {
+				team1AdcScore = score
+			} else {
+				team2AdcScore = score
+			}
+		case PositionSupport:
+			score = float64(participant.PositionFavor.Support+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionSupportEffectiveness
+			if participant.Team == 1 {
+				team1SupportScore = score
+			} else {
+				team2SupportScore = score
+			}
+		}
+
+		if participant.Team == 1 {
+			team1LineScore += score
+		} else {
+			team2LineScore += score
+		}
+	}
+
+	// positive: team1 is better
+	topScoreDiff := math.Abs(team1TopScore - team2TopScore)
+	jungleScoreDiff := math.Abs(team1JungleScore - team2JungleScore)
+	midScoreDiff := math.Abs(team1MidScore - team2MidScore)
+	adcScoreDiff := math.Abs(team1AdcScore - team2AdcScore)
+	supportScoreDiff := math.Abs(team1SupportScore - team2SupportScore)
+
+	var lineScoreDiffSum float64 = 0
+	lineScoreDiffSum += math.Pow(topScoreDiff, 2.0)
+	lineScoreDiffSum += math.Pow(jungleScoreDiff, 2.0)
+	lineScoreDiffSum += math.Pow(midScoreDiff, 2.0)
+	lineScoreDiffSum += math.Pow(adcScoreDiff, 2.0)
+	lineScoreDiffSum += math.Pow(supportScoreDiff, 2.0)
+
+	// regularize (0~inf) -> (0~1)
+	lineScoreDiffSum = math.Sqrt(lineScoreDiffSum)
+	lineFairness := util.LogisticNormalize(lineScoreDiffSum, 2000)
+
+	// calculate tierFairness
+	teamScoreDiff := math.Abs(team1LineScore - team2LineScore)
+	tierFairness := util.LogisticNormalize(teamScoreDiff, 2000)
+
+	// TODO :: get with user input
+	lineFairnessWeight := 0.4
+	tierFairnessWeight := 0.6
+	totalFairness := lineFairness*lineFairnessWeight + tierFairness*tierFairnessWeight
+
+	log.Debugf("team1 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team1TopScore, team1JungleScore, team1MidScore, team1AdcScore, team1SupportScore)
+	log.Debugf("team2 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team2TopScore, team2JungleScore, team2MidScore, team2AdcScore, team2SupportScore)
+	log.Debugf("line fairness: %.5f, tier fairness: %.5f, total fairness: %.5f", lineFairness, tierFairness, totalFairness)
+
+	// update
+	configDAO.Fairness = totalFairness
+	configDAO.LineFairness = lineFairness
+	configDAO.TierFairness = tierFairness
+	if err := configDAO.Upsert(db); err != nil {
+		log.Error(err)
+		return err
+	}
+
+	return nil
+}
+
+//func FindBalancedCustomGameConfig(db db.Context) (*models.CustomGameDAO, error) {
+//	// get all custom game configs
+//	configDAOs, err := models.GetCustomGameDAOs(db)
+//	if err != nil {
+//		log.Error(err)
+//		return nil, err
+//	}
+//
+//	// find config with highest fairness
+//	var highestFairness float64 = 0
+//	var highestFairnessConfig *models.CustomGameDAO = nil
+//	for _, configDAO := range configDAOs {
+//		if configDAO.Fairness > highestFairness {
+//			highestFairness = configDAO.Fairness
+//			highestFairnessConfig = configDAO
+//		}
+//	}
+//
+//	return highestFairnessConfig, nil
+//}

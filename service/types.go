@@ -16,6 +16,12 @@ const (
 	PositionAdc     = "ADC"
 	PositionSupport = "SUPPORT"
 
+	PositionTopEffectiveness     = 0.14
+	PositionJungleEffectiveness  = 0.23
+	PositionMidEffectiveness     = 0.25
+	PositionAdcEffectiveness     = 0.21
+	PositionSupportEffectiveness = 1 - PositionTopEffectiveness - PositionJungleEffectiveness - PositionMidEffectiveness - PositionAdcEffectiveness
+
 	MatchDecoTypeFirstBloodKill     = "FIRST_BLOOD"
 	MatchDecoTypeHighestDamage      = "HIGHEST_DAMAGE"
 	MatchDecoTypeHighestDamageTaken = "HIGHEST_DAMAGE_TAKEN"
@@ -28,4 +34,8 @@ const (
 	MatchDecoTypeMostWardPlaced     = "MOST_WARD_PLACED"
 	MatchDecoTypeMostWardKilled     = "MOST_WARD_KILLED"
 	MatchDecoTypeHighestVisionScore = "HIGHEST_VISION_SCORE"
+)
+
+var (
+	SupportedPositions = []string{PositionTop, PositionJungle, PositionMid, PositionAdc, PositionSupport}
 )

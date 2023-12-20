@@ -9,3 +9,7 @@ func ShortenSummonerName(name string) string {
 	name = strings.ToLower(name)
 	return name
 }
+
+func LogisticNormalize(x float64, factor float64) float64 {
+	return 1 / (1 + (x / factor))
+}

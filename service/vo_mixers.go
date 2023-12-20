@@ -145,7 +145,7 @@ func CustomGameConfigurationSummaryMixer(d models.CustomGameConfigurationDAO) Cu
 		Id:            d.Id,
 		Name:          d.Name,
 		LastUpdatedAt: d.LastUpdatedAt,
-		Fairness:      d.Fairness,
+		Balance:       CustomGameConfigurationFairnessMixer(d),
 	}
 }
 
@@ -165,11 +165,17 @@ func CustomGameConfigurationMixer(d models.CustomGameConfigurationDAO,
 		CreatorUid:    d.CreatorUid,
 		CreatedAt:     d.CreatedAt,
 		LastUpdatedAt: d.LastUpdatedAt,
-		Fairness:      d.Fairness,
-		LineFairness:  d.LineFairness,
-		TierFairness:  d.TierFairness,
+		Balance:       CustomGameConfigurationFairnessMixer(d),
 		Candidates:    candidates,
 		Team1:         team1,
 		Team2:         team2,
+	}
+}
+
+func CustomGameConfigurationFairnessMixer(d models.CustomGameConfigurationDAO) CustomGameConfigurationBalanceVO {
+	return CustomGameConfigurationBalanceVO{
+		Fairness:     d.Fairness,
+		LineFairness: d.LineFairness,
+		TierFairness: d.TierFairness,
 	}
 }

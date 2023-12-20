@@ -11,11 +11,11 @@ type CustomGameCandidateDAO struct {
 	Puuid              string  `db:"puuid" json:"puuid"`
 	CustomTier         *string `db:"custom_tier" json:"customTier"`
 	CustomRank         *string `db:"custom_rank" json:"customRank"`
-	FlavorTop          bool    `db:"flavor_top" json:"flavorTop"`
-	FlavorJungle       bool    `db:"flavor_jungle" json:"flavorJungle"`
-	FlavorMid          bool    `db:"flavor_mid" json:"flavorMid"`
-	FlavorAdc          bool    `db:"flavor_adc" json:"flavorAdc"`
-	FlavorSupport      bool    `db:"flavor_support" json:"flavorSupport"`
+	FlavorTop          int     `db:"flavor_top" json:"flavorTop"`
+	FlavorJungle       int     `db:"flavor_jungle" json:"flavorJungle"`
+	FlavorMid          int     `db:"flavor_mid" json:"flavorMid"`
+	FlavorAdc          int     `db:"flavor_adc" json:"flavorAdc"`
+	FlavorSupport      int     `db:"flavor_support" json:"flavorSupport"`
 }
 
 func (c *CustomGameCandidateDAO) Upsert(db db.Context) error {

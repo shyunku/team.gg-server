@@ -242,18 +242,18 @@ type PerkStyleInfoVO struct {
 }
 
 type CustomGameConfigurationSummaryVO struct {
-	Id            string    `json:"id"`
-	Name          string    `json:"name"`
-	LastUpdatedAt time.Time `json:"lastUpdatedAt"`
-	Fairness      float64   `json:"fairness"`
+	Id            string                           `json:"id"`
+	Name          string                           `json:"name"`
+	LastUpdatedAt time.Time                        `json:"lastUpdatedAt"`
+	Balance       CustomGameConfigurationBalanceVO `json:"balance"`
 }
 
 type CustomGameCandidatePositionFavorVO struct {
-	Top     bool `json:"top"`
-	Jungle  bool `json:"jungle"`
-	Mid     bool `json:"mid"`
-	Adc     bool `json:"adc"`
-	Support bool `json:"support"`
+	Top     int `json:"top"`
+	Jungle  int `json:"jungle"`
+	Mid     int `json:"mid"`
+	Adc     int `json:"adc"`
+	Support int `json:"support"`
 }
 
 type CustomGameCandidateVO struct {
@@ -265,20 +265,42 @@ type CustomGameCandidateVO struct {
 	Mastery       []SummonerMasteryVO                `json:"mastery"`
 }
 
+func (c *CustomGameCandidateVO) GetRepresentativeRank() *SummonerRankVO {
+	if c.CustomRank != nil {
+		return c.CustomRank
+	} else if c.SoloRank != nil {
+		return c.SoloRank
+	} else {
+		return c.FlexRank
+	}
+}
+
+func (c *CustomGameCandidateVO) GetRepresentativeRatingPoint() int64 {
+	representativeRank := c.GetRepresentativeRank()
+	if representativeRank == nil {
+		return 0
+	}
+	return representativeRank.RatingPoint
+}
+
 type CustomGameParticipantVO struct {
 	Position string `json:"position"`
 	Puuid    string `json:"puuid"`
 }
 
+type CustomGameConfigurationBalanceVO struct {
+	Fairness     float64 `json:"fairness"`
+	LineFairness float64 `json:"lineFairness"`
+	TierFairness float64 `json:"tierFairness"`
+}
+
 type CustomGameConfigurationVO struct {
-	Id            string    `json:"id"`
-	Name          string    `json:"name"`
-	CreatorUid    string    `json:"creatorUid"`
-	CreatedAt     time.Time `json:"createdAt"`
-	LastUpdatedAt time.Time `json:"lastUpdatedAt"`
-	Fairness      float64   `json:"fairness"`
-	LineFairness  float64   `json:"lineFairness"`
-	TierFairness  float64   `json:"tierFairness"`
+	Id            string                           `json:"id"`
+	Name          string                           `json:"name"`
+	CreatorUid    string                           `json:"creatorUid"`
+	CreatedAt     time.Time                        `json:"createdAt"`
+	LastUpdatedAt time.Time                        `json:"lastUpdatedAt"`
+	Balance       CustomGameConfigurationBalanceVO `json:"balance"`
 
 	Candidates []CustomGameCandidateVO `json:"candidates"`
 

@@ -7,6 +7,7 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
 	"team.gg-server/controllers/middlewares"
+	"team.gg-server/controllers/socket"
 	"team.gg-server/controllers/test"
 	v1 "team.gg-server/controllers/v1"
 	"team.gg-server/core"
@@ -28,15 +29,7 @@ func SetupRouter() *gin.Engine {
 		"http://localhost:8080",
 	}
 	config.AllowCredentials = true
-	config.AllowHeaders = []string{
-		"Origin",
-		"Content-Length",
-		"Content-Type",
-		"Access-Control-Allow-Origin",
-		"Access-Control-Allow-Headers",
-		"Access-Control-Allow-Credentials",
-		"Authorization",
-	}
+	config.AllowHeaders = []string{"*"}
 
 	r := gin.Default()
 	r.Use(cors.New(config))
@@ -48,6 +41,7 @@ func SetupRouter() *gin.Engine {
 	if core.DebugMode {
 		test.UseTestRouter(r)
 	}
+	socket.UseSocket(r)
 
 	// 404
 	r.NoRoute(func(c *gin.Context) {
