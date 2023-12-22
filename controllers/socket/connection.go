@@ -8,13 +8,17 @@ import (
 	"github.com/googollee/go-socket.io/engineio/transport/websocket"
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
+	"team.gg-server/controllers/middlewares"
+	"team.gg-server/libs/db"
+	"team.gg-server/models"
 )
 
 var (
-	SocketManager = NewSocketManager()
+	SocketIO = NewSocketManager()
 )
 
 func UseSocket(r *gin.Engine) {
+	g := r.Group("/socket.io")
 	io := socketio.NewServer(&engineio.Options{
 		Transports: []transport.Transport{
 			//&polling.Transport{
@@ -25,9 +29,10 @@ func UseSocket(r *gin.Engine) {
 			&websocket.Transport{},
 		},
 	})
-	SocketManager.Io = io
+	SocketIO.Io = io
 	userHandlers(io)
 
+	log.Infof("socket.io server started")
 	go func() {
 		err := io.Serve()
 		if err != nil {
@@ -35,19 +40,41 @@ func UseSocket(r *gin.Engine) {
 			log.Fatal(err)
 			os.Exit(1)
 		}
-		log.Infof("socket.io server started")
 	}()
 
-	r.GET("/socket.io/", gin.WrapH(io))
-	r.POST("/socket.io/", func(c *gin.Context) {
+	wrapper := func(c *gin.Context) {
+		c.Request.Header.Del("Origin")
 		io.ServeHTTP(c.Writer, c.Request)
-	})
+	}
+
+	g.Use(middlewares.UnsafeAuthMiddleware)
+	g.GET("/*any", wrapper)
+	g.POST("/*any", wrapper)
 }
 
 func userHandlers(io *socketio.Server) {
 	io.OnConnect("/", func(s socketio.Conn) error {
 		log.Infof("Socket connected: %v", s.ID())
-		SocketManager.AddUser(nil, s)
+		req := s.RemoteHeader()
+		uid := req.Get("uid")
+		log.Debugf("uid: %v", uid)
+
+		if len(uid) != 0 {
+			// get user
+			userDAO, exists, err := models.GetUserDAO_byUid(db.Root, uid)
+			if err != nil {
+				log.Warn(err)
+				return err
+			}
+			if !exists {
+				log.Warnf("User not found: %v", uid)
+				return nil
+			}
+			SocketIO.AddUser(userDAO, s)
+		} else {
+			SocketIO.AddUser(nil, s)
+		}
+
 		return nil
 	})
 
@@ -57,11 +84,18 @@ func userHandlers(io *socketio.Server) {
 
 	io.OnDisconnect("/", func(s socketio.Conn, reason string) {
 		log.Debugf("Socket disconnected: %v", reason)
-		SocketManager.RemoveUserByConnId(s.ID())
+		SocketIO.RemoveUserByConnId(s.ID())
 		s.LeaveAll()
 	})
 
 	io.OnEvent("/", EventTest, func(s socketio.Conn, msg string) {
-		s.Emit(EventTest, "test")
+		log.Debugf("Socket event: [%v] %v", s.ID(), msg)
+		s.Emit(EventTest, msg)
+	})
+
+	/* ---------------------- custom ---------------------- */
+	io.OnEvent("/", EventJoinCustomConfigRoom, func(s socketio.Conn, configId string) {
+		log.Debugf("Socket event: [%v] %v", s.ID(), configId)
+		s.Join(RoomKey(configId))
 	})
 }

@@ -2,12 +2,17 @@ package socket
 
 import (
 	socketio "github.com/googollee/go-socket.io"
+	log "github.com/shyunku-libraries/go-logger"
 	"team.gg-server/models"
 )
 
 // types
 const (
 	EventTest = "test"
+
+	EventJoinCustomConfigRoom        = "join_custom_config_room"
+	EventCustomConfigOptimizeProcess = "custom_config/optimize_process"
+	EventCustomConfigUpdated         = "custom_config/updated"
 )
 
 type UserSocket struct {
@@ -51,13 +56,41 @@ func (sm *Manager) RemoveUserByConnId(connId string) {
 	userSocket, ok := sm.sockets[connId]
 	if ok {
 		delete(sm.sockets, connId)
-		delete(sm.users, userSocket.User.UserId)
+		if userSocket.User != nil {
+			delete(sm.users, userSocket.User.UserId)
+		}
 	}
 }
 
 func (sm *Manager) GetUserByUserId(userId string) (UserSocket, bool) {
 	userSocket, ok := sm.users[userId]
 	return userSocket, ok
+}
+
+func (sm *Manager) BroadcastToCustomConfigRoom(configId string, event string, data interface{}) {
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+	roomKey := RoomKey(configId)
+	sm.Io.BroadcastToRoom("/", roomKey, event, data)
+}
+
+func (sm *Manager) MulticastToCustomConfigRoom(configId string, exceptUid string, event string, data interface{}) {
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+	exceptSocket, ok := sm.GetUserByUserId(exceptUid)
+	if !ok {
+		log.Debugf("configId: %s, exceptUid: %s, event: %s, data: %v", configId, exceptUid, event, data)
+		sm.BroadcastToCustomConfigRoom(configId, event, data)
+	} else {
+		roomKey := RoomKey(configId)
+		sm.Io.ForEach("/", roomKey, func(conn socketio.Conn) {
+			if conn.ID() != exceptSocket.Conn.ID() {
+				conn.Emit(event, data)
+			}
+		})
+	}
 }
 
 // -------------------------------------------------------------------------------------
@@ -82,4 +115,16 @@ func NewSuccess(data interface{}) Response {
 
 func NewFailure(errMsg string) Response {
 	return NewResponse(false, nil, &errMsg)
+}
+
+/* ---------------------- custom event data (must be minimized) ---------------------- */
+
+const (
+	TypeCustomConfigOptimizeProcessCombinating = "combinating"
+	TypeCustomConfigOptimizeProcessCalculating = "calculating"
+)
+
+type CustomConfigOptimizeProcessData struct {
+	Type     string  `json:"type"`
+	Progress float64 `json:"progress"`
 }

@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.1.10"
+const VERSION = "0.2.0"
 
 func main() {
 	fmt.Println(`
@@ -29,6 +29,9 @@ func main() {
 	`)
 	log.Info("team.gg Server is now starting...")
 	log.Info("Version: ", VERSION)
+
+	// randomize seed
+	rand.Seed(time.Now().UnixNano())
 
 	// Create Jwt secret key if needed
 	//crypto.PrintNewJwtSecret()

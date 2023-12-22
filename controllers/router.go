@@ -29,7 +29,12 @@ func SetupRouter() *gin.Engine {
 		"http://localhost:8080",
 	}
 	config.AllowCredentials = true
-	config.AllowHeaders = []string{"*"}
+	//config.AllowHeaders = []string{
+	//	"Origin",
+	//	"Content-Length",
+	//	"Content-Type",
+	//	"Authorization",
+	//}
 
 	r := gin.Default()
 	r.Use(cors.New(config))

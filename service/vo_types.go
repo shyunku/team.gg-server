@@ -283,6 +283,12 @@ func (c *CustomGameCandidateVO) GetRepresentativeRatingPoint() int64 {
 	return representativeRank.RatingPoint
 }
 
+type CustomGameTeamParticipantVO struct {
+	CustomGameCandidateVO
+	Team     int    `json:"team"`
+	Position string `json:"position"`
+}
+
 type CustomGameParticipantVO struct {
 	Position string `json:"position"`
 	Puuid    string `json:"puuid"`
@@ -294,6 +300,22 @@ type CustomGameConfigurationBalanceVO struct {
 	TierFairness float64 `json:"tierFairness"`
 }
 
+type CustomGameConfigurationWeightsVO struct {
+	LineFairness float64 `json:"lineFairness"`
+	TierFairness float64 `json:"tierFairness"`
+
+	TopInfluence     float64 `json:"topInfluence"`
+	JungleInfluence  float64 `json:"jungleInfluence"`
+	MidInfluence     float64 `json:"midInfluence"`
+	AdcInfluence     float64 `json:"adcInfluence"`
+	SupportInfluence float64 `json:"supportInfluence"`
+}
+
+type CustomGameTeamPositionVO struct {
+	Team     int
+	Position string
+}
+
 type CustomGameConfigurationVO struct {
 	Id            string                           `json:"id"`
 	Name          string                           `json:"name"`
@@ -301,6 +323,8 @@ type CustomGameConfigurationVO struct {
 	CreatedAt     time.Time                        `json:"createdAt"`
 	LastUpdatedAt time.Time                        `json:"lastUpdatedAt"`
 	Balance       CustomGameConfigurationBalanceVO `json:"balance"`
+
+	Weights CustomGameConfigurationWeightsVO `json:"weights"`
 
 	Candidates []CustomGameCandidateVO `json:"candidates"`
 

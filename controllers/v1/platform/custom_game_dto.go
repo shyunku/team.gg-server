@@ -52,3 +52,20 @@ type SetCustomGameParticipantFavorPositionRequestDto struct {
 	FavorPosition      string `json:"favorPosition" binding:"required"`
 	Strength           *int   `json:"strength" binding:"required"`
 }
+
+type OptimizeCustomGameConfigurationRequestDto struct {
+	Id string `json:"id" binding:"required"`
+
+	LineFairnessWeight *float64 `json:"lineFairnessWeight" binding:"required"`
+	TierFairnessWeight *float64 `json:"tierFairnessWeight" binding:"required"`
+
+	TopInfluenceWeight     *float64 `json:"topInfluenceWeight" binding:"required"`
+	JungleInfluenceWeight  *float64 `json:"jungleInfluenceWeight" binding:"required"`
+	MidInfluenceWeight     *float64 `json:"midInfluenceWeight" binding:"required"`
+	AdcInfluenceWeight     *float64 `json:"adcInfluenceWeight" binding:"required"`
+	SupportInfluenceWeight *float64 `json:"supportInfluenceWeight" binding:"required"`
+}
+
+type UtilityRequestDto struct {
+	Id string `json:"id" binding:"required"`
+}

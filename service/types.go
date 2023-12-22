@@ -16,11 +16,14 @@ const (
 	PositionAdc     = "ADC"
 	PositionSupport = "SUPPORT"
 
-	PositionTopEffectiveness     = 0.14
-	PositionJungleEffectiveness  = 0.23
-	PositionMidEffectiveness     = 0.25
-	PositionAdcEffectiveness     = 0.21
-	PositionSupportEffectiveness = 1 - PositionTopEffectiveness - PositionJungleEffectiveness - PositionMidEffectiveness - PositionAdcEffectiveness
+	WeightLineFairness = 0.7
+	WeightTierFairness = 1 - WeightLineFairness
+
+	WeightTopInfluence     = 0.14
+	WeightJungleInfluence  = 0.23
+	WeightMidInfluence     = 0.25
+	WeightAdcInfluence     = 0.21
+	WeightSupportInfluence = 1 - WeightTopInfluence - WeightJungleInfluence - WeightMidInfluence - WeightAdcInfluence
 
 	MatchDecoTypeFirstBloodKill     = "FIRST_BLOOD"
 	MatchDecoTypeHighestDamage      = "HIGHEST_DAMAGE"
@@ -37,5 +40,19 @@ const (
 )
 
 var (
-	SupportedPositions = []string{PositionTop, PositionJungle, PositionMid, PositionAdc, PositionSupport}
+	GetSupportedPositions    = [...]string{PositionTop, PositionJungle, PositionMid, PositionAdc, PositionSupport}
+	GetPossibleTeamPositions = func() []CustomGameTeamPositionVO {
+		return []CustomGameTeamPositionVO{
+			{Team: 1, Position: PositionTop},
+			{Team: 1, Position: PositionJungle},
+			{Team: 1, Position: PositionMid},
+			{Team: 1, Position: PositionAdc},
+			{Team: 1, Position: PositionSupport},
+			{Team: 2, Position: PositionTop},
+			{Team: 2, Position: PositionJungle},
+			{Team: 2, Position: PositionMid},
+			{Team: 2, Position: PositionAdc},
+			{Team: 2, Position: PositionSupport},
+		}
+	}
 )

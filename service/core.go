@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	log "github.com/shyunku-libraries/go-logger"
 	"math"
+	"team.gg-server/controllers/socket"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/third_party/riot"
@@ -495,7 +496,6 @@ func RenewSummonerMatchIfNecessary(db db.Context, puuid string, matchId string) 
 }
 
 func RecalculateCustomGameBalance(db db.Context, configId string) error {
-	// get custom game config
 	configDAO, exists, err := models.GetCustomGameDAO_byId(db, configId)
 	if err != nil {
 		log.Error(err)
@@ -505,11 +505,38 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 		return fmt.Errorf("custom game config (%s) doesn't exist", configId)
 	}
 
+	participantVOsMap, err := GetCurrentCustomGameTeamParticipantVOMap(db, configId)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// calculate fairness
+	weightsVO := CustomGameConfigurationWeightsMixer(*configDAO)
+	fairnessVO, err := calculateCustomGameConfigFairness(participantVOsMap, weightsVO)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// update
+	configDAO.Fairness = fairnessVO.Fairness
+	configDAO.LineFairness = fairnessVO.LineFairness
+	configDAO.TierFairness = fairnessVO.TierFairness
+	if err := configDAO.Upsert(db); err != nil {
+		log.Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func GetCurrentCustomGameTeamParticipantVOMap(db db.Context, configId string) (map[string]CustomGameTeamParticipantVO, error) {
 	// get custom game candidates
 	candidateDAOs, err := models.GetCustomGameCandidateDAOs_byCustomGameConfigId(db, configId)
 	if err != nil {
 		log.Error(err)
-		return err
+		return nil, err
 	}
 
 	candidatesMap := make(map[string]models.CustomGameCandidateDAO)
@@ -521,32 +548,144 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(db, configId)
 	if err != nil {
 		log.Error(err)
-		return err
+		return nil, err
 	}
 
-	type Participant struct {
-		CustomGameCandidateVO
-		Team     int
-		Position string
-	}
-
-	participantVOsMap := make(map[string]Participant)
+	participantVOsMap := make(map[string]CustomGameTeamParticipantVO)
 	for _, participantDAO := range participantDAOs {
 		candidateDAO := candidatesMap[participantDAO.Puuid]
 		candidateVO, err := GetCustomGameCandidateVO(candidateDAO)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		participantVOsMap[participantDAO.Puuid] = Participant{
+		participantVOsMap[participantDAO.Puuid] = CustomGameTeamParticipantVO{
 			CustomGameCandidateVO: *candidateVO,
 			Team:                  participantDAO.Team,
 			Position:              participantDAO.Position,
 		}
 	}
 
+	return participantVOsMap, nil
+}
+
+func FindBalancedCustomGameConfig(
+	configId string,
+	originalTeamParticipantMap map[string]CustomGameTeamParticipantVO,
+	weights CustomGameConfigurationWeightsVO,
+) (*map[string]CustomGameTeamParticipantVO, error) {
+	participants := make([]CustomGameTeamParticipantVO, 0)
+	for _, participant := range originalTeamParticipantMap {
+		participants = append(participants, participant)
+	}
+
+	if len(participants) > 10 {
+		return nil, fmt.Errorf("too many participants (%d)", len(participants))
+	}
+
+	possibleTeamPositions := GetPossibleTeamPositions()
+
+	participantCount := len(participants)
+	predictedAllCasesCount := util.Permutation(int64(len(possibleTeamPositions)), int64(participantCount))
+	totalProcessibleCount := 2 * predictedAllCasesCount
+
+	var combinate func(arr []CustomGameTeamPositionVO, n int) [][]CustomGameTeamPositionVO
+	combinate = func(arr []CustomGameTeamPositionVO, n int) [][]CustomGameTeamPositionVO {
+		if n == 1 {
+			returnArr := make([][]CustomGameTeamPositionVO, 0)
+			for _, v := range arr {
+				returnArr = append(returnArr, []CustomGameTeamPositionVO{v})
+			}
+			return returnArr
+		}
+
+		result := make([][]CustomGameTeamPositionVO, 0)
+		for i := 0; i < len(arr); i++ {
+			picked := arr[i]
+			// except picked
+			remain := make([]CustomGameTeamPositionVO, 0)
+			for j := 0; j < len(arr); j++ {
+				if i == j {
+					continue
+				}
+				remain = append(remain, arr[j])
+			}
+
+			subCombinations := combinate(remain, n-1)
+			for _, x := range subCombinations {
+				combination := append(x, picked)
+				if len(combination) == participantCount && len(result)%50000 == 0 {
+					socket.SocketIO.BroadcastToCustomConfigRoom(
+						configId,
+						socket.EventCustomConfigOptimizeProcess,
+						socket.CustomConfigOptimizeProcessData{
+							Type:     socket.TypeCustomConfigOptimizeProcessCombinating,
+							Progress: float64(len(result)) / float64(totalProcessibleCount),
+						},
+					)
+				}
+				result = append(result, combination)
+			}
+		}
+		return result
+	}
+
+	// get all possible team participant maps
+	combinations := combinate(possibleTeamPositions, participantCount)
+	log.Debugf("found %d possible team participant maps", len(combinations))
+
+	if int64(len(combinations)) != predictedAllCasesCount {
+		log.Errorf("predicted all cases count (%d) != actual all cases count (%d)", predictedAllCasesCount, len(combinations))
+		return nil, fmt.Errorf("predicted all cases count (%d) != actual all cases count (%d)", predictedAllCasesCount, len(combinations))
+	}
+
+	// find most balanced team participant map
+	var highestFairness float64 = 0
+	var highestFairnessConfig map[string]CustomGameTeamParticipantVO = nil
+	for index, teamPositions := range combinations {
+		if index%50000 == 0 {
+			socket.SocketIO.BroadcastToCustomConfigRoom(
+				configId,
+				socket.EventCustomConfigOptimizeProcess,
+				socket.CustomConfigOptimizeProcessData{
+					Type:     socket.TypeCustomConfigOptimizeProcessCalculating,
+					Progress: float64(int64(index)+predictedAllCasesCount) / float64(totalProcessibleCount),
+				},
+			)
+		}
+
+		teamParticipantMap := make(map[string]CustomGameTeamParticipantVO)
+		for i, participant := range participants {
+			teamPosition := teamPositions[i]
+			participant.Team = teamPosition.Team
+			participant.Position = teamPosition.Position
+			teamParticipantMap[participant.Summary.Puuid] = participant
+		}
+
+		fairnessVO, err := calculateCustomGameConfigFairness(teamParticipantMap, weights)
+		if err != nil {
+			return nil, err
+		}
+
+		if fairnessVO.Fairness > highestFairness {
+			highestFairness = fairnessVO.Fairness
+			highestFairnessConfig = teamParticipantMap
+		}
+	}
+
+	log.Debugf("highest fairness: %.5f", highestFairness)
+
+	return &highestFairnessConfig, nil
+}
+
+func calculateCustomGameConfigFairness(
+	teamParticipantMap map[string]CustomGameTeamParticipantVO,
+	weights CustomGameConfigurationWeightsVO) (*CustomGameConfigurationBalanceVO, error) {
 	// calculate line score
 	var team1LineScore float64 = 0
 	var team2LineScore float64 = 0
+
+	var team1TierScore float64 = 0
+	var team2TierScore float64 = 0
 
 	// calculate each line score
 	var team1TopScore float64 = 0
@@ -560,40 +699,53 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 	var team2AdcScore float64 = 0
 	var team2SupportScore float64 = 0
 
-	for _, participant := range participantVOsMap {
-		log.Debugf("team %d - %s: %s", participant.Team, participant.Position, participant.Summary.GameName)
+	favorWeight := func(favor int) float64 {
+		switch favor {
+		case 0:
+			return 0.5
+		case 1:
+			return 1.0
+		case 2:
+			return 1.5
+		default:
+			return 0.0
+		}
+	}
+
+	for _, participant := range teamParticipantMap {
+		//log.Debugf("team %d - %s: %s", participant.Team, participant.Position, participant.Summary.GameName)
 		var score float64 = 0
 		switch participant.Position {
 		case PositionTop:
-			score = float64(participant.PositionFavor.Top+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionTopEffectiveness
+			score = favorWeight(participant.PositionFavor.Top) * float64(participant.GetRepresentativeRatingPoint()) * weights.TopInfluence
 			if participant.Team == 1 {
 				team1TopScore = score
 			} else {
 				team2TopScore = score
 			}
 		case PositionJungle:
-			score = float64(participant.PositionFavor.Jungle+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionJungleEffectiveness
+			score = favorWeight(participant.PositionFavor.Jungle) * float64(participant.GetRepresentativeRatingPoint()) * weights.JungleInfluence
 			if participant.Team == 1 {
 				team1JungleScore = score
 			} else {
 				team2JungleScore = score
 			}
 		case PositionMid:
-			score = float64(participant.PositionFavor.Mid+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionMidEffectiveness
+			score = favorWeight(participant.PositionFavor.Mid) * float64(participant.GetRepresentativeRatingPoint()) * weights.MidInfluence
 			if participant.Team == 1 {
 				team1MidScore = score
 			} else {
 				team2MidScore = score
 			}
 		case PositionAdc:
-			score = float64(participant.PositionFavor.Adc+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionAdcEffectiveness
+			score = favorWeight(participant.PositionFavor.Adc) * float64(participant.GetRepresentativeRatingPoint()) * weights.AdcInfluence
 			if participant.Team == 1 {
 				team1AdcScore = score
 			} else {
 				team2AdcScore = score
 			}
 		case PositionSupport:
-			score = float64(participant.PositionFavor.Support+1) * float64(participant.GetRepresentativeRatingPoint()) * PositionSupportEffectiveness
+			score = favorWeight(participant.PositionFavor.Support) * float64(participant.GetRepresentativeRatingPoint()) * weights.SupportInfluence
 			if participant.Team == 1 {
 				team1SupportScore = score
 			} else {
@@ -603,8 +755,10 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 
 		if participant.Team == 1 {
 			team1LineScore += score
+			team1TierScore += float64(participant.GetRepresentativeRatingPoint())
 		} else {
 			team2LineScore += score
+			team2TierScore += float64(participant.GetRepresentativeRatingPoint())
 		}
 	}
 
@@ -623,51 +777,53 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 	lineScoreDiffSum += math.Pow(supportScoreDiff, 2.0)
 
 	// regularize (0~inf) -> (0~1)
+	var lineFairness float64 = 0
 	lineScoreDiffSum = math.Sqrt(lineScoreDiffSum)
-	lineFairness := util.LogisticNormalize(lineScoreDiffSum, 2000)
-
-	// calculate tierFairness
-	teamScoreDiff := math.Abs(team1LineScore - team2LineScore)
-	tierFairness := util.LogisticNormalize(teamScoreDiff, 2000)
-
-	// TODO :: get with user input
-	lineFairnessWeight := 0.4
-	tierFairnessWeight := 0.6
-	totalFairness := lineFairness*lineFairnessWeight + tierFairness*tierFairnessWeight
-
-	log.Debugf("team1 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team1TopScore, team1JungleScore, team1MidScore, team1AdcScore, team1SupportScore)
-	log.Debugf("team2 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team2TopScore, team2JungleScore, team2MidScore, team2AdcScore, team2SupportScore)
-	log.Debugf("line fairness: %.5f, tier fairness: %.5f, total fairness: %.5f", lineFairness, tierFairness, totalFairness)
-
-	// update
-	configDAO.Fairness = totalFairness
-	configDAO.LineFairness = lineFairness
-	configDAO.TierFairness = tierFairness
-	if err := configDAO.Upsert(db); err != nil {
-		log.Error(err)
-		return err
+	if team1LineScore == 0 || team2LineScore == 0 {
+		lineFairness = 0
+	} else {
+		lineFairness = util.LogisticNormalize(lineScoreDiffSum, 1000)
 	}
 
-	return nil
+	// calculate tierFairness
+	var tierFairness float64 = 0
+	tierScoreDiff := math.Abs(team1TierScore - team2TierScore)
+	maxTierScore := math.Max(team1TierScore, team2TierScore)
+	if maxTierScore != 0 {
+		tierScoreDiffRate := tierScoreDiff / maxTierScore
+		if tierScoreDiffRate == 1 {
+			tierFairness = 0
+		} else {
+			scaledDiffRate := util.PolynomialToInfiniteScale(tierScoreDiffRate)
+			tierFairness = util.LogisticNormalize(scaledDiffRate, 0.3)
+		}
+	}
+
+	totalFairness := lineFairness*weights.LineFairness + tierFairness*weights.TierFairness
+
+	//log.Debugf("team1 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team1TopScore, team1JungleScore, team1MidScore, team1AdcScore, team1SupportScore)
+	//log.Debugf("team2 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team2TopScore, team2JungleScore, team2MidScore, team2AdcScore, team2SupportScore)
+	//log.Debugf("line fairness: %.5f, tier fairness: %.5f, total fairness: %.5f", lineFairness, tierFairness, totalFairness)
+
+	return &CustomGameConfigurationBalanceVO{
+		Fairness:     totalFairness,
+		LineFairness: lineFairness,
+		TierFairness: tierFairness,
+	}, nil
 }
 
-//func FindBalancedCustomGameConfig(db db.Context) (*models.CustomGameDAO, error) {
-//	// get all custom game configs
-//	configDAOs, err := models.GetCustomGameDAOs(db)
-//	if err != nil {
-//		log.Error(err)
-//		return nil, err
-//	}
-//
-//	// find config with highest fairness
-//	var highestFairness float64 = 0
-//	var highestFairnessConfig *models.CustomGameDAO = nil
-//	for _, configDAO := range configDAOs {
-//		if configDAO.Fairness > highestFairness {
-//			highestFairness = configDAO.Fairness
-//			highestFairnessConfig = configDAO
-//		}
-//	}
-//
-//	return highestFairnessConfig, nil
-//}
+func CheckPermissionForCustomGameConfig(db db.Context, configId string, uid string) (bool, error) {
+	customGameConfigurationDAO, exists, err := models.GetCustomGameDAO_byId(db, configId)
+	if err != nil {
+		log.Error(err)
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	if customGameConfigurationDAO.CreatorUid != uid {
+		return false, nil
+	}
+
+	return true, nil
+}

@@ -18,12 +18,6 @@ create table matches
     tournament_code      varchar(255) not null
 );
 
-create index matches_game_end_timestamp_index
-    on matches (game_end_timestamp);
-
-create index matches_game_start_timestamp_index
-    on matches (game_start_timestamp);
-
 create table match_participants
 (
     match_id                           varchar(255) not null,
@@ -93,15 +87,6 @@ create table match_participants
         foreign key (match_id) references matches (match_id)
             on update cascade on delete cascade
 );
-
-create index match_participants_match_participant_id_index
-    on match_participants (match_participant_id);
-
-create index match_participants_participant_id_index
-    on match_participants (participant_id);
-
-create index match_participants_summoner_puuid_fk
-    on match_participants (puuid);
 
 create table match_participant_details
 (
@@ -197,6 +182,15 @@ create table match_participant_perks
             on update cascade on delete cascade
 );
 
+create index match_participants_match_participant_id_index
+    on match_participants (match_participant_id);
+
+create index match_participants_participant_id_index
+    on match_participants (participant_id);
+
+create index match_participants_summoner_puuid_fk
+    on match_participants (puuid);
+
 create table match_teams
 (
     match_id          varchar(255) not null,
@@ -219,9 +213,6 @@ create table match_teams
             on update cascade on delete cascade
 );
 
-create index match_teams_team_id_index
-    on match_teams (team_id);
-
 create table match_team_bans
 (
     match_id    varchar(255) not null,
@@ -235,6 +226,15 @@ create table match_team_bans
         foreign key (match_id) references matches (match_id)
             on update cascade on delete cascade
 );
+
+create index match_teams_team_id_index
+    on match_teams (team_id);
+
+create index matches_game_end_timestamp_index
+    on matches (game_end_timestamp);
+
+create index matches_game_start_timestamp_index
+    on matches (game_start_timestamp);
 
 create table summoners
 (
@@ -302,6 +302,76 @@ create table summoner_matches
         foreign key (match_id) references matches (match_id)
             on update cascade on delete cascade,
     constraint summoner_matches_summoners_puuid_fk
+        foreign key (puuid) references summoners (puuid)
+            on update cascade on delete cascade
+);
+
+create table users
+(
+    uid          varchar(255) not null
+        primary key,
+    user_id      varchar(255) not null,
+    encrypted_pw varchar(255) not null,
+    constraint user_id
+        unique (user_id)
+);
+
+create table custom_game_configurations
+(
+    id                       varchar(255)            not null
+        primary key,
+    name                     varchar(255)            not null,
+    creator_uid              varchar(255)            not null,
+    created_at               datetime                not null,
+    last_updated_at          datetime                not null,
+    is_public                tinyint(1) default 0    not null,
+    fairness                 double                  not null,
+    line_fairness            double                  not null,
+    tier_fairness            double                  not null,
+    line_fairness_weight     double     default 0.6  not null,
+    tier_fairness_weight     double     default 0.4  not null,
+    top_influence_weight     double     default 0.14 not null,
+    jungle_influence_weight  double     default 0.23 not null,
+    mid_influence_weight     double     default 0.25 not null,
+    adc_influence_weight     double     default 0.21 not null,
+    support_influence_weight double     default 0.17 not null,
+    constraint custom_game_configurations_users_uid_fk
+        foreign key (creator_uid) references users (uid)
+            on update cascade on delete cascade
+);
+
+create table custom_game_candidates
+(
+    custom_game_config_id varchar(255)  not null,
+    puuid                 varchar(255)  not null,
+    custom_tier           varchar(255)  null,
+    custom_rank           varchar(255)  null,
+    flavor_top            int default 0 not null,
+    flavor_jungle         int default 0 not null,
+    flavor_mid            int default 0 not null,
+    flavor_adc            int default 0 not null,
+    flavor_support        int default 0 not null,
+    primary key (custom_game_config_id, puuid),
+    constraint custom_game_candidates_custom_game_configurations_id_fk
+        foreign key (custom_game_config_id) references custom_game_configurations (id)
+            on update cascade on delete cascade,
+    constraint custom_game_candidates_summoners_puuid_fk
+        foreign key (puuid) references summoners (puuid)
+);
+
+create table custom_game_participants
+(
+    custom_game_config_id varchar(255)  not null,
+    puuid                 varchar(255)  not null,
+    team                  int default 0 not null,
+    position              varchar(255)  not null,
+    primary key (custom_game_config_id, puuid),
+    constraint custom_game_participants_pk
+        unique (team, position),
+    constraint custom_game_participants_custom_game_configurations_id_fk
+        foreign key (custom_game_config_id) references custom_game_configurations (id)
+            on update cascade on delete cascade,
+    constraint custom_game_participants_summoners_puuid_fk
         foreign key (puuid) references summoners (puuid)
             on update cascade on delete cascade
 );

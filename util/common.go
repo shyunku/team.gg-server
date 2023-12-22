@@ -119,3 +119,14 @@ func StructToReadable(src interface{}) *bytes.Buffer {
 func Sha256(data string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
 }
+
+func Factorial(n int64) int64 {
+	if n == 0 {
+		return 1
+	}
+	return n * Factorial(n-1)
+}
+
+func Permutation(n int64, r int64) int64 {
+	return Factorial(n) / Factorial(n-r)
+}

@@ -169,6 +169,19 @@ func CustomGameConfigurationMixer(d models.CustomGameConfigurationDAO,
 		Candidates:    candidates,
 		Team1:         team1,
 		Team2:         team2,
+		Weights:       CustomGameConfigurationWeightsMixer(d),
+	}
+}
+
+func CustomGameConfigurationWeightsMixer(d models.CustomGameConfigurationDAO) CustomGameConfigurationWeightsVO {
+	return CustomGameConfigurationWeightsVO{
+		LineFairness:     d.LineFairnessWeight,
+		TierFairness:     d.TierFairnessWeight,
+		TopInfluence:     d.TopInfluenceWeight,
+		JungleInfluence:  d.JungleInfluenceWeight,
+		MidInfluence:     d.MidInfluenceWeight,
+		AdcInfluence:     d.AdcInfluenceWeight,
+		SupportInfluence: d.SupportInfluenceWeight,
 	}
 }
 

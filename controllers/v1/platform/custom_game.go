@@ -5,7 +5,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	log "github.com/shyunku-libraries/go-logger"
+	"math/rand"
 	"net/http"
+	"team.gg-server/controllers/socket"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/service"
@@ -23,10 +25,17 @@ func UseCustomGameRouter(r *gin.RouterGroup) {
 
 	g.GET("/tier-rank", GetTierRank)
 	g.GET("/balance", GetCustomConfigurationBalance)
+
 	g.PUT("/candidate", AddCandidateToCustomGameConfiguration)
 	g.POST("/arrange", ArrangeCustomGameParticipant)
 	g.POST("/unarrange", UnarrangeCustomGameParticipant)
 	g.POST("/favor-position", SetCustomGameParticipantFavorPosition)
+	g.POST("/optimize", OptimizeCustomGameConfiguration)
+
+	g.POST("/arrange-all", SelectMaxCandidates)
+	g.POST("/unarrange-all", UnarrangeAllParticipants)
+	g.POST("/swap-team", SwapTeam)
+	g.POST("/shuffle", ShuffleTeam)
 }
 
 func GetCustomGameConfigurationList(c *gin.Context) {
@@ -71,28 +80,53 @@ func CreateCustomGameConfiguration(c *gin.Context) {
 		return
 	}
 
-	namePrefix := "내전 팀 구성"
+	userDAO, exists, err := models.GetUserDAO_byUid(db.Root, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "user not found")
+		return
+	}
+
+	var name string
+	namePrefix := fmt.Sprintf("%s의 내전 팀 구성", userDAO.UserId)
 	nameSuffix := 1
-	name := fmt.Sprintf("%s %d", namePrefix, nameSuffix)
+
+	configMapByName := make(map[string]bool)
 	for _, customGameConfigurationDAO := range customGameConfigurationDAOs {
-		if customGameConfigurationDAO.Name == name {
-			nameSuffix++
-			name = fmt.Sprintf("%s %d", namePrefix, nameSuffix)
+		configMapByName[customGameConfigurationDAO.Name] = true
+	}
+
+	for {
+		name = fmt.Sprintf("%s %d", namePrefix, nameSuffix)
+		if _, exists := configMapByName[name]; !exists {
+			break
 		}
+		nameSuffix++
 	}
 
 	// create custom game configuration
 	newId := uuid.New().String()
 	now := time.Now()
 	newCustomGameConfigurationDAO := models.CustomGameConfigurationDAO{
-		Id:            newId,
-		Name:          name,
-		CreatorUid:    uid,
-		CreatedAt:     now,
-		LastUpdatedAt: now,
-		Fairness:      0,
-		LineFairness:  0,
-		TierFairness:  0,
+		Id:                     newId,
+		Name:                   name,
+		CreatorUid:             uid,
+		CreatedAt:              now,
+		LastUpdatedAt:          now,
+		Fairness:               0,
+		LineFairness:           0,
+		TierFairness:           0,
+		LineFairnessWeight:     service.WeightLineFairness,
+		TierFairnessWeight:     service.WeightTierFairness,
+		TopInfluenceWeight:     service.WeightTopInfluence,
+		JungleInfluenceWeight:  service.WeightJungleInfluence,
+		MidInfluenceWeight:     service.WeightMidInfluence,
+		AdcInfluenceWeight:     service.WeightAdcInfluence,
+		SupportInfluenceWeight: service.WeightSupportInfluence,
 	}
 	if err := newCustomGameConfigurationDAO.Upsert(db.Root); err != nil {
 		log.Error(err)
@@ -269,6 +303,7 @@ func AddCandidateToCustomGameConfiguration(c *gin.Context) {
 		return
 	}
 
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
 	c.JSON(http.StatusOK, candidateVO)
 }
 
@@ -414,6 +449,7 @@ func ArrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
 	c.JSON(http.StatusOK, nil)
 }
 
@@ -443,16 +479,35 @@ func UnarrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
-	if err := service.RecalculateCustomGameBalance(db.Root, req.CustomGameConfigId); err != nil {
-		log.Error(err)
-	}
-
-	if err := models.DeleteCustomGameParticipantDAO_byPuuid(db.Root, req.CustomGameConfigId, req.Puuid); err != nil {
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
+	if err := models.DeleteCustomGameParticipantDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.CustomGameConfigId); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
 	c.JSON(http.StatusOK, nil)
 }
 
@@ -467,17 +522,13 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 	uid := c.GetString("uid")
 
 	// check if user is creator of custom game
-	customGameConfigurationDAO, exists, err := models.GetCustomGameDAO_byId(db.Root, req.CustomGameConfigId)
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.CustomGameConfigId, uid)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	if !exists {
-		util.AbortWithStrJson(c, http.StatusNotFound, "custom game configuration not found")
-		return
-	}
-	if customGameConfigurationDAO.CreatorUid != uid {
+	if !permitted {
 		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
 		return
 	}
@@ -553,5 +604,485 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 		return
 	}
 
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func OptimizeCustomGameConfiguration(c *gin.Context) {
+	var req OptimizeCustomGameConfigurationRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// check if user is creator of custom game
+	customGameConfigurationDAO, exists, err := models.GetCustomGameDAO_byId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		util.AbortWithStrJson(c, http.StatusNotFound, "custom game configuration not found")
+		return
+	}
+	if customGameConfigurationDAO.CreatorUid != uid {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	if req.LineFairnessWeight == nil || *req.LineFairnessWeight < 0 || *req.LineFairnessWeight > 1 {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid line fairness weight")
+		return
+	}
+	if req.TopInfluenceWeight == nil || *req.TopInfluenceWeight < 0 || *req.TopInfluenceWeight > 1 {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid top influence weight")
+		return
+	}
+	if req.JungleInfluenceWeight == nil || *req.JungleInfluenceWeight < 0 || *req.JungleInfluenceWeight > 1 {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid jungle influence weight")
+		return
+	}
+	if req.MidInfluenceWeight == nil || *req.MidInfluenceWeight < 0 || *req.MidInfluenceWeight > 1 {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid mid influence weight")
+		return
+	}
+	if req.AdcInfluenceWeight == nil || *req.AdcInfluenceWeight < 0 || *req.AdcInfluenceWeight > 1 {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid adc influence weight")
+		return
+	}
+
+	customGameConfigurationDAO.LineFairnessWeight = *req.LineFairnessWeight
+	customGameConfigurationDAO.TierFairnessWeight = 1 - *req.LineFairnessWeight
+	customGameConfigurationDAO.TopInfluenceWeight = *req.TopInfluenceWeight
+	customGameConfigurationDAO.JungleInfluenceWeight = *req.JungleInfluenceWeight
+	customGameConfigurationDAO.MidInfluenceWeight = *req.MidInfluenceWeight
+	customGameConfigurationDAO.AdcInfluenceWeight = *req.AdcInfluenceWeight
+	customGameConfigurationDAO.SupportInfluenceWeight = 1 - *req.TopInfluenceWeight - *req.JungleInfluenceWeight - *req.MidInfluenceWeight - *req.AdcInfluenceWeight
+
+	if err := customGameConfigurationDAO.Upsert(tx); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	participantVOsMap, err := service.GetCurrentCustomGameTeamParticipantVOMap(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	configWeightsVO := service.CustomGameConfigurationWeightsMixer(*customGameConfigurationDAO)
+	optimizedParticipantVOsMap, err := service.FindBalancedCustomGameConfig(req.Id, participantVOsMap, configWeightsVO)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// reorganize participants
+
+	participantVOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	for _, participantVO := range participantVOs {
+		// delete
+		if err := participantVO.Delete(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	for _, participantVO := range participantVOs {
+		teamParticipantVO, exists := (*optimizedParticipantVOsMap)[participantVO.Puuid]
+		if !exists {
+			log.Errorf("participant not found in optimized map")
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		participantVO.Team = teamParticipantVO.Team
+		participantVO.Position = teamParticipantVO.Position
+		if err := participantVO.Upsert(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.Id, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func SelectMaxCandidates(c *gin.Context) {
+	var req UtilityRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.Id, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// get all candidates
+	candidateDAOs, err := models.GetCustomGameCandidateDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// get all participants
+	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	nonParticipantCandidateDAOs := make([]models.CustomGameCandidateDAO, 0)
+	for _, candidateDAO := range candidateDAOs {
+		exists := false
+		for _, participantDAO := range participantDAOs {
+			if candidateDAO.Puuid == participantDAO.Puuid {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			nonParticipantCandidateDAOs = append(nonParticipantCandidateDAOs, candidateDAO)
+		}
+	}
+
+	possibleTeamPositions := service.GetPossibleTeamPositions()
+	unOccupiedTeamPositions := make([]service.CustomGameTeamPositionVO, 0)
+	for _, teamPosition := range possibleTeamPositions {
+		exists := false
+		for _, participantDAO := range participantDAOs {
+			if teamPosition.Team == participantDAO.Team && teamPosition.Position == participantDAO.Position {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			unOccupiedTeamPositions = append(unOccupiedTeamPositions, teamPosition)
+		}
+	}
+
+	i := 0
+	j := 0
+	for i < len(nonParticipantCandidateDAOs) && j < len(unOccupiedTeamPositions) {
+		nonParticipantCandidateDAO := nonParticipantCandidateDAOs[i]
+		unOccupiedTeamPosition := unOccupiedTeamPositions[j]
+
+		// add participant
+		newParticipantDAO := models.CustomGameParticipantDAO{
+			CustomGameConfigId: req.Id,
+			Puuid:              nonParticipantCandidateDAO.Puuid,
+			Team:               unOccupiedTeamPosition.Team,
+			Position:           unOccupiedTeamPosition.Position,
+		}
+		if err := newParticipantDAO.Upsert(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		i++
+		j++
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.Id, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func UnarrangeAllParticipants(c *gin.Context) {
+	var req UtilityRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.Id, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// delete all participants
+	if err := models.DeleteCustomGameParticipantDAOs_byId(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// recalculate balance
+	if err := service.RecalculateCustomGameBalance(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.Id, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func SwapTeam(c *gin.Context) {
+	var req UtilityRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.Id, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// get all participants
+	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// delete all participants
+	if err := models.DeleteCustomGameParticipantDAOs_byId(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	for _, participantDAO := range participantDAOs {
+		if participantDAO.Team == 1 {
+			participantDAO.Team = 2
+		} else {
+			participantDAO.Team = 1
+		}
+
+		if err := participantDAO.Upsert(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.Id, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func ShuffleTeam(c *gin.Context) {
+	var req UtilityRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.Id, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// get all participants
+	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	possibleTeamPositions := service.GetPossibleTeamPositions()
+
+	// shuffle
+	rand.Shuffle(len(possibleTeamPositions), func(i, j int) {
+		possibleTeamPositions[i], possibleTeamPositions[j] = possibleTeamPositions[j], possibleTeamPositions[i]
+	})
+
+	// delete all participants
+	if err := models.DeleteCustomGameParticipantDAOs_byId(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	i := 0
+	for _, participantDAO := range participantDAOs {
+		participantDAO.Team = possibleTeamPositions[i].Team
+		participantDAO.Position = possibleTeamPositions[i].Position
+
+		if err := participantDAO.Upsert(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		i++
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.Id, uid, socket.EventCustomConfigUpdated, nil)
 	c.JSON(http.StatusOK, nil)
 }

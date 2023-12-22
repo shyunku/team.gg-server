@@ -28,6 +28,15 @@ func (s *CustomGameParticipantDAO) Upsert(db db.Context) error {
 	return nil
 }
 
+func (s *CustomGameParticipantDAO) Delete(db db.Context) error {
+	if _, err := db.Exec(`
+		DELETE FROM custom_game_participants 
+		WHERE custom_game_config_id = ? AND puuid = ?`, s.CustomGameConfigId, s.Puuid); err != nil {
+		return err
+	}
+	return nil
+}
+
 func GetCustomGameParticipantDAOs_byCustomGameConfigId(db db.Context, customGameConfigId string) ([]*CustomGameParticipantDAO, error) {
 	var customGameParticipants []*CustomGameParticipantDAO
 	if err := db.Select(&customGameParticipants, "SELECT * FROM custom_game_participants WHERE custom_game_config_id = ?", customGameConfigId); err != nil {
@@ -66,6 +75,15 @@ func DeleteCustomGameParticipantDAO_byPuuid(db db.Context, customGameConfigId, p
 	if _, err := db.Exec(`
 		DELETE FROM custom_game_participants 
 		WHERE custom_game_config_id = ? AND puuid = ?`, customGameConfigId, puuid); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteCustomGameParticipantDAOs_byId(db db.Context, customGameConfigId string) error {
+	if _, err := db.Exec(`
+		DELETE FROM custom_game_participants 
+		WHERE custom_game_config_id = ?`, customGameConfigId); err != nil {
 		return err
 	}
 	return nil
