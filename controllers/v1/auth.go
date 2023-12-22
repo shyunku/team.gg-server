@@ -64,6 +64,7 @@ func Login(c *gin.Context) {
 
 	accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
 	log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), userDAO.UserId)
+	c.SetSameSite(http.SameSiteNoneMode)
 	c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
 		"/", "", false, true)
 
@@ -116,6 +117,7 @@ func Signup(c *gin.Context) {
 }
 
 func Logout(c *gin.Context) { // delete cookie
+	c.SetSameSite(http.SameSiteNoneMode)
 	c.SetCookie("accessToken", "", -1, "/", "", false, true)
 	c.JSON(http.StatusOK, nil)
 }

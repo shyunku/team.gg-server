@@ -84,6 +84,7 @@ func AuthMiddleware(c *gin.Context) {
 
 		accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
 		log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), uid)
+		c.SetSameSite(http.SameSiteNoneMode)
 		c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
 			"/", "", false, true)
 	}
@@ -152,6 +153,7 @@ func UnsafeAuthMiddleware(c *gin.Context) {
 
 		accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
 		log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), uid)
+		c.SetSameSite(http.SameSiteNoneMode)
 		c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
 			"/", "", false, true)
 	}
