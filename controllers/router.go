@@ -27,6 +27,7 @@ func SetupRouter() *gin.Engine {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{
 		"http://localhost:8080",
+		"http://team.gg.s3-website.ap-northeast-2.amazonaws.com",
 	}
 	config.AllowCredentials = true
 	//config.AllowHeaders = []string{

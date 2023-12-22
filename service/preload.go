@@ -9,6 +9,7 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"io"
 	"os"
+	"regexp"
 	"team.gg-server/core"
 	"team.gg-server/libs/http"
 	"team.gg-server/util"
@@ -216,22 +217,32 @@ func SanitizeAndLoadDataDragonFile() error {
 	// remove old data dragon tar.gz files
 	var ddragonTarGzEntries []os.DirEntry
 	var latestDdragonTarGzEntry *os.DirEntry
+	var latestDdragonTarGzVersion string
 	for _, file := range files {
 		ddragonTarGzEntries = append(ddragonTarGzEntries, file)
 		entryName := file.Name()
-		updateLatest := func() {
-			latestDdragonTarGzEntry = &file
+
+		versionRegex := regexp.MustCompile(`\d+\.\d+\.\d+`)
+		entryVersion := versionRegex.FindString(entryName)
+		if entryVersion == "" {
+			log.Warnf("failed to parse version (%s)", entryName)
+			continue
 		}
 
-		if latestDdragonTarGzEntry == nil {
+		updateLatest := func() {
+			latestDdragonTarGzEntry = &file
+			latestDdragonTarGzVersion = entryVersion
+		}
+
+		if latestDdragonTarGzEntry == nil || latestDdragonTarGzVersion == "" {
 			updateLatest()
 		} else {
-			latestVersion, err := version.NewVersion((*latestDdragonTarGzEntry).Name())
+			latestVersion, err := version.NewVersion(latestDdragonTarGzVersion)
 			if err != nil {
-				log.Warnf("failed to parse version (%s)", (*latestDdragonTarGzEntry).Name())
+				log.Warnf("failed to parse version (%s)", latestDdragonTarGzVersion)
 				continue
 			}
-			currentVersion, err := version.NewVersion(entryName)
+			currentVersion, err := version.NewVersion(entryVersion)
 			if err != nil {
 				log.Warnf("failed to parse version (%s)", entryName)
 				continue
