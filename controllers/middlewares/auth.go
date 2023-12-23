@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
-	"team.gg-server/controllers"
+	util2 "team.gg-server/controllers/util"
 	"team.gg-server/libs/auth"
 	"team.gg-server/libs/crypto"
 	"team.gg-server/util"
@@ -81,7 +81,7 @@ func AuthMiddleware(c *gin.Context) {
 			util.AbortWithStrJson(c, http.StatusUnauthorized, "internal server error")
 			return
 		}
-		controllers.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
+		util2.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
 	}
 
 	c.Set("uid", uid)
@@ -145,7 +145,7 @@ func UnsafeAuthMiddleware(c *gin.Context) {
 		if err != nil {
 			return
 		}
-		controllers.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
+		util2.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
 	}
 
 	c.Set("uid", uid)

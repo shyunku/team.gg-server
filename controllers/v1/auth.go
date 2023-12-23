@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
-	"team.gg-server/controllers"
+	util2 "team.gg-server/controllers/util"
 	"team.gg-server/libs/auth"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
@@ -61,7 +61,7 @@ func Login(c *gin.Context) {
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	controllers.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
+	util2.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
 
 	resp := LoginResponseDto{
 		Uid:    userDAO.Uid,
@@ -111,8 +111,8 @@ func Signup(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
-func Logout(c *gin.Context) { // delete cookie
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("accessToken", "", -1, "/", "", false, true)
+func Logout(c *gin.Context) {
+	// delete cookie
+	util2.DeleteAccessTokenCookie(c)
 	c.JSON(http.StatusOK, nil)
 }

@@ -1,4 +1,4 @@
-package controllers
+package util
 
 import (
 	"github.com/gin-gonic/gin"
@@ -10,4 +10,10 @@ func SetAccessTokenCookie(c *gin.Context, token string, refreshTokenExpireDurati
 	secureMode := !core.DebugMode
 	c.SetSameSite(http.SameSiteNoneMode)
 	c.SetCookie("accessToken", token, refreshTokenExpireDuration, "/", "", secureMode, true)
+}
+
+func DeleteAccessTokenCookie(c *gin.Context) {
+	secureMode := !core.DebugMode
+	c.SetSameSite(http.SameSiteNoneMode)
+	c.SetCookie("accessToken", "", -1, "/", "", secureMode, true)
 }
