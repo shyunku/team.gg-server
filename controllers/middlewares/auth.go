@@ -4,10 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
+	"team.gg-server/controllers"
 	"team.gg-server/libs/auth"
 	"team.gg-server/libs/crypto"
 	"team.gg-server/util"
-	"time"
 )
 
 func AuthMiddleware(c *gin.Context) {
@@ -81,12 +81,7 @@ func AuthMiddleware(c *gin.Context) {
 			util.AbortWithStrJson(c, http.StatusUnauthorized, "internal server error")
 			return
 		}
-
-		accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
-		log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), uid)
-		c.SetSameSite(http.SameSiteNoneMode)
-		c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
-			"/", "", false, true)
+		controllers.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
 	}
 
 	c.Set("uid", uid)
@@ -150,12 +145,7 @@ func UnsafeAuthMiddleware(c *gin.Context) {
 		if err != nil {
 			return
 		}
-
-		accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
-		log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), uid)
-		c.SetSameSite(http.SameSiteNoneMode)
-		c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
-			"/", "", false, true)
+		controllers.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
 	}
 
 	c.Set("uid", uid)

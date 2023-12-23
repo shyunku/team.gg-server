@@ -5,11 +5,11 @@ import (
 	"github.com/google/uuid"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
+	"team.gg-server/controllers"
 	"team.gg-server/libs/auth"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/util"
-	"time"
 )
 
 func UseAuthRouter(r *gin.RouterGroup) {
@@ -61,12 +61,7 @@ func Login(c *gin.Context) {
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
-
-	accessTokenExpiresAt := time.Unix(authTokenBundle.AccessToken.ExpiresAt, 0)
-	log.Debugf("access token will expire at %s of user %s", util.StdFormatTime(accessTokenExpiresAt), userDAO.UserId)
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("accessToken", authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()),
-		"/", "", false, true)
+	controllers.SetAccessTokenCookie(c, authTokenBundle.AccessToken.Token, int(refreshTokenExpireDuration.Seconds()))
 
 	resp := LoginResponseDto{
 		Uid:    userDAO.Uid,
