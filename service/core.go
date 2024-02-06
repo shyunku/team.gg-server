@@ -523,6 +523,7 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 	configDAO.Fairness = fairnessVO.Fairness
 	configDAO.LineFairness = fairnessVO.LineFairness
 	configDAO.TierFairness = fairnessVO.TierFairness
+	configDAO.LineSatisfaction = fairnessVO.LineSatisfaction
 	if err := configDAO.Upsert(db); err != nil {
 		log.Error(err)
 		return err
@@ -586,8 +587,29 @@ func FindBalancedCustomGameConfig(
 
 	participantCount := len(participants)
 	predictedAllCasesCount := util.Permutation(int64(len(possibleTeamPositions)), int64(participantCount))
-	totalProcessibleCount := 2 * predictedAllCasesCount
+	totalProcessibleCount := predictedAllCasesCount
 
+	getFairness := func(combination []CustomGameTeamPositionVO) (float64, error) {
+		teamParticipantMap := make(map[string]CustomGameTeamParticipantVO)
+		for i, participant := range participants {
+			teamPosition := combination[i]
+			participant.Team = teamPosition.Team
+			participant.Position = teamPosition.Position
+			teamParticipantMap[participant.Summary.Puuid] = participant
+		}
+
+		fairnessVO, err := calculateCustomGameConfigFairness(teamParticipantMap, weights)
+		if err != nil {
+			return 0, err
+		}
+
+		return fairnessVO.Fairness, nil
+	}
+
+	// find most balanced team participant map
+	var highestFairness float64 = 0
+	var highestFairnessConfig map[string]CustomGameTeamParticipantVO = nil
+	index := 0
 	var combinate func(arr []CustomGameTeamPositionVO, n int) [][]CustomGameTeamPositionVO
 	combinate = func(arr []CustomGameTeamPositionVO, n int) [][]CustomGameTeamPositionVO {
 		if n == 1 {
@@ -613,69 +635,50 @@ func FindBalancedCustomGameConfig(
 			subCombinations := combinate(remain, n-1)
 			for _, x := range subCombinations {
 				combination := append(x, picked)
-				if len(combination) == participantCount && len(result)%50000 == 0 {
-					log.Debugf("combinating... (%d/%d)", len(result), totalProcessibleCount)
-					socket.SocketIO.BroadcastToCustomConfigRoom(
-						configId,
-						socket.EventCustomConfigOptimizeProcess,
-						socket.CustomConfigOptimizeProcessData{
-							Type:     socket.TypeCustomConfigOptimizeProcessCombinating,
-							Progress: float64(len(result)) / float64(totalProcessibleCount),
-						},
-					)
+				if len(combination) == participantCount {
+					if index%10000 == 0 {
+						//log.Debugf("combinating... (%d/%d)", index, totalProcessibleCount)
+						socket.SocketIO.BroadcastToCustomConfigRoom(
+							configId,
+							socket.EventCustomConfigOptimizeProcess,
+							socket.CustomConfigOptimizeProcessData{
+								Type:     socket.TypeCustomConfigOptimizeProcessCombinating,
+								Progress: float64(index) / float64(totalProcessibleCount),
+							},
+						)
+					}
+					index += 1
+					fairness, err := getFairness(combination)
+					if err != nil {
+						log.Error(err)
+						return nil
+					}
+					if fairness > highestFairness {
+						highestFairness = fairness
+						highestFairnessConfig = make(map[string]CustomGameTeamParticipantVO)
+						for i, participant := range participants {
+							participant.Team = combination[i].Team
+							participant.Position = combination[i].Position
+							highestFairnessConfig[participant.Summary.Puuid] = participant
+						}
+					}
+				} else {
+					result = append(result, combination)
 				}
-				result = append(result, combination)
 			}
 		}
 		return result
 	}
 
 	// get all possible team participant maps
-	combinations := combinate(possibleTeamPositions, participantCount)
-	log.Debugf("found %d possible team participant maps", len(combinations))
+	_ = combinate(possibleTeamPositions, participantCount)
+	log.Debugf("found balanced team participant combination")
 
-	if int64(len(combinations)) != predictedAllCasesCount {
-		log.Errorf("predicted all cases count (%d) != actual all cases count (%d)", predictedAllCasesCount, len(combinations))
-		return nil, fmt.Errorf("predicted all cases count (%d) != actual all cases count (%d)", predictedAllCasesCount, len(combinations))
-	}
-
-	// find most balanced team participant map
-	var highestFairness float64 = 0
-	var highestFairnessConfig map[string]CustomGameTeamParticipantVO = nil
-	for index, teamPositions := range combinations {
-		if index%50000 == 0 {
-			log.Debugf("calculating... (%d/%d)", int64(index)+predictedAllCasesCount, totalProcessibleCount)
-			socket.SocketIO.BroadcastToCustomConfigRoom(
-				configId,
-				socket.EventCustomConfigOptimizeProcess,
-				socket.CustomConfigOptimizeProcessData{
-					Type:     socket.TypeCustomConfigOptimizeProcessCalculating,
-					Progress: float64(int64(index)+predictedAllCasesCount) / float64(totalProcessibleCount),
-				},
-			)
-		}
-
-		teamParticipantMap := make(map[string]CustomGameTeamParticipantVO)
-		for i, participant := range participants {
-			teamPosition := teamPositions[i]
-			participant.Team = teamPosition.Team
-			participant.Position = teamPosition.Position
-			teamParticipantMap[participant.Summary.Puuid] = participant
-		}
-
-		fairnessVO, err := calculateCustomGameConfigFairness(teamParticipantMap, weights)
-		if err != nil {
-			return nil, err
-		}
-
-		if fairnessVO.Fairness > highestFairness {
-			highestFairness = fairnessVO.Fairness
-			highestFairnessConfig = teamParticipantMap
-		}
+	if highestFairnessConfig == nil {
+		return nil, fmt.Errorf("failed to find balanced team participant combination")
 	}
 
 	log.Debugf("highest fairness: %.5f", highestFairness)
-
 	return &highestFairnessConfig, nil
 }
 
@@ -701,6 +704,8 @@ func calculateCustomGameConfigFairness(
 	var team2AdcScore float64 = 0
 	var team2SupportScore float64 = 0
 
+	var lineSatisfaction float64 = 0
+
 	favorWeight := func(favor int) float64 {
 		switch favor {
 		case 0:
@@ -719,6 +724,7 @@ func calculateCustomGameConfigFairness(
 		var score float64 = 0
 		switch participant.Position {
 		case PositionTop:
+			lineSatisfaction += favorWeight(participant.PositionFavor.Top)
 			score = favorWeight(participant.PositionFavor.Top) * float64(participant.GetRepresentativeRatingPoint()) * weights.TopInfluence
 			if participant.Team == 1 {
 				team1TopScore = score
@@ -726,6 +732,7 @@ func calculateCustomGameConfigFairness(
 				team2TopScore = score
 			}
 		case PositionJungle:
+			lineSatisfaction += favorWeight(participant.PositionFavor.Jungle)
 			score = favorWeight(participant.PositionFavor.Jungle) * float64(participant.GetRepresentativeRatingPoint()) * weights.JungleInfluence
 			if participant.Team == 1 {
 				team1JungleScore = score
@@ -733,6 +740,7 @@ func calculateCustomGameConfigFairness(
 				team2JungleScore = score
 			}
 		case PositionMid:
+			lineSatisfaction += favorWeight(participant.PositionFavor.Mid)
 			score = favorWeight(participant.PositionFavor.Mid) * float64(participant.GetRepresentativeRatingPoint()) * weights.MidInfluence
 			if participant.Team == 1 {
 				team1MidScore = score
@@ -740,6 +748,7 @@ func calculateCustomGameConfigFairness(
 				team2MidScore = score
 			}
 		case PositionAdc:
+			lineSatisfaction += favorWeight(participant.PositionFavor.Adc)
 			score = favorWeight(participant.PositionFavor.Adc) * float64(participant.GetRepresentativeRatingPoint()) * weights.AdcInfluence
 			if participant.Team == 1 {
 				team1AdcScore = score
@@ -747,6 +756,7 @@ func calculateCustomGameConfigFairness(
 				team2AdcScore = score
 			}
 		case PositionSupport:
+			lineSatisfaction += favorWeight(participant.PositionFavor.Support)
 			score = favorWeight(participant.PositionFavor.Support) * float64(participant.GetRepresentativeRatingPoint()) * weights.SupportInfluence
 			if participant.Team == 1 {
 				team1SupportScore = score
@@ -787,6 +797,10 @@ func calculateCustomGameConfigFairness(
 		lineFairness = util.LogisticNormalize(lineScoreDiffSum, 1000)
 	}
 
+	// regularize line satisfaction (0~10) -> (0~1)
+	lineSatisfactionScore := lineSatisfaction / 20.0
+	lineSatisfactionWeight := 0.4
+
 	// calculate tierFairness
 	var tierFairness float64 = 0
 	tierScoreDiff := math.Abs(team1TierScore - team2TierScore)
@@ -801,16 +815,18 @@ func calculateCustomGameConfigFairness(
 		}
 	}
 
-	totalFairness := lineFairness*weights.LineFairness + tierFairness*weights.TierFairness
+	totalFairness := (lineFairness*weights.LineFairness+tierFairness*weights.TierFairness)*(1-lineSatisfactionWeight) + lineSatisfactionScore*lineSatisfactionWeight
 
 	//log.Debugf("team1 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team1TopScore, team1JungleScore, team1MidScore, team1AdcScore, team1SupportScore)
 	//log.Debugf("team2 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team2TopScore, team2JungleScore, team2MidScore, team2AdcScore, team2SupportScore)
 	//log.Debugf("line fairness: %.5f, tier fairness: %.5f, total fairness: %.5f", lineFairness, tierFairness, totalFairness)
 
+	//log.Debugf("line satisfaction: %.5f, line satisfaction score: %.5f", lineSatisfaction, lineSatisfactionScore)
 	return &CustomGameConfigurationBalanceVO{
-		Fairness:     totalFairness,
-		LineFairness: lineFairness,
-		TierFairness: tierFairness,
+		Fairness:         totalFairness,
+		LineFairness:     lineFairness,
+		TierFairness:     tierFairness,
+		LineSatisfaction: lineSatisfactionScore,
 	}, nil
 }
 

@@ -6,15 +6,16 @@ import (
 )
 
 type CustomGameConfigurationDAO struct {
-	Id            string    `db:"id" json:"id"`
-	Name          string    `db:"name" json:"name"`
-	CreatorUid    string    `db:"creator_uid" json:"creatorUid"`
-	CreatedAt     time.Time `db:"created_at" json:"createdAt"`
-	LastUpdatedAt time.Time `db:"last_updated_at" json:"lastUpdatedAt"`
-	IsPublic      bool      `db:"is_public" json:"isPublic"`
-	Fairness      float64   `db:"fairness" json:"fairness"`
-	LineFairness  float64   `db:"line_fairness" json:"lineFairness"`
-	TierFairness  float64   `db:"tier_fairness" json:"tierFairness"`
+	Id               string    `db:"id" json:"id"`
+	Name             string    `db:"name" json:"name"`
+	CreatorUid       string    `db:"creator_uid" json:"creatorUid"`
+	CreatedAt        time.Time `db:"created_at" json:"createdAt"`
+	LastUpdatedAt    time.Time `db:"last_updated_at" json:"lastUpdatedAt"`
+	IsPublic         bool      `db:"is_public" json:"isPublic"`
+	Fairness         float64   `db:"fairness" json:"fairness"`
+	LineFairness     float64   `db:"line_fairness" json:"lineFairness"`
+	TierFairness     float64   `db:"tier_fairness" json:"tierFairness"`
+	LineSatisfaction float64   `db:"line_satisfaction" json:"lineSatisfaction"`
 
 	LineFairnessWeight float64 `db:"line_fairness_weight" json:"lineFairnessWeight"`
 	TierFairnessWeight float64 `db:"tier_fairness_weight" json:"tierFairnessWeight"`
@@ -29,11 +30,11 @@ type CustomGameConfigurationDAO struct {
 func (c *CustomGameConfigurationDAO) Upsert(db db.Context) error {
 	if _, err := db.Exec(`
 	INSERT INTO custom_game_configurations (
-		id, name, creator_uid, created_at, last_updated_at, is_public, fairness, line_fairness, tier_fairness,
-		line_fairness_weight, tier_fairness_weight,
+		id, name, creator_uid, created_at, last_updated_at, is_public, fairness, line_fairness, tier_fairness, line_satisfaction,
+		line_fairness_weight, tier_fairness_weight, 
 		top_influence_weight, jungle_influence_weight, mid_influence_weight, adc_influence_weight, support_influence_weight
 	) VALUES (
-		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 	) ON DUPLICATE KEY UPDATE
 	    name = ?,
 		last_updated_at = ?,
@@ -41,6 +42,7 @@ func (c *CustomGameConfigurationDAO) Upsert(db db.Context) error {
 		fairness = ?,
 		line_fairness = ?,
 		tier_fairness = ?,
+		line_satisfaction = ?,
 		line_fairness_weight = ?,
 		tier_fairness_weight = ?,
 		top_influence_weight = ?,
@@ -48,10 +50,10 @@ func (c *CustomGameConfigurationDAO) Upsert(db db.Context) error {
 		mid_influence_weight = ?,
 		adc_influence_weight = ?,
 		support_influence_weight = ?`,
-		c.Id, c.Name, c.CreatorUid, c.CreatedAt, c.LastUpdatedAt, c.IsPublic, c.Fairness, c.LineFairness, c.TierFairness,
+		c.Id, c.Name, c.CreatorUid, c.CreatedAt, c.LastUpdatedAt, c.IsPublic, c.Fairness, c.LineFairness, c.TierFairness, c.LineSatisfaction,
 		c.LineFairnessWeight, c.TierFairnessWeight,
 		c.TopInfluenceWeight, c.JungleInfluenceWeight, c.MidInfluenceWeight, c.AdcInfluenceWeight, c.SupportInfluenceWeight,
-		c.Name, c.LastUpdatedAt, c.IsPublic, c.Fairness, c.LineFairness, c.TierFairness,
+		c.Name, c.LastUpdatedAt, c.IsPublic, c.Fairness, c.LineFairness, c.TierFairness, c.LineSatisfaction,
 		c.LineFairnessWeight, c.TierFairnessWeight,
 		c.TopInfluenceWeight, c.JungleInfluenceWeight, c.MidInfluenceWeight, c.AdcInfluenceWeight, c.SupportInfluenceWeight,
 	); err != nil {

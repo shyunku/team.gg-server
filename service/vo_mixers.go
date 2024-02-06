@@ -187,8 +187,9 @@ func CustomGameConfigurationWeightsMixer(d models.CustomGameConfigurationDAO) Cu
 
 func CustomGameConfigurationFairnessMixer(d models.CustomGameConfigurationDAO) CustomGameConfigurationBalanceVO {
 	return CustomGameConfigurationBalanceVO{
-		Fairness:     d.Fairness,
-		LineFairness: d.LineFairness,
-		TierFairness: d.TierFairness,
+		Fairness:         d.Fairness,
+		LineFairness:     d.LineFairness,
+		TierFairness:     d.TierFairness,
+		LineSatisfaction: d.LineSatisfaction,
 	}
 }

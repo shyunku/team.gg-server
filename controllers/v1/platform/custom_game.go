@@ -120,6 +120,7 @@ func CreateCustomGameConfiguration(c *gin.Context) {
 		Fairness:               0,
 		LineFairness:           0,
 		TierFairness:           0,
+		LineSatisfaction:       0,
 		LineFairnessWeight:     service.WeightLineFairness,
 		TierFairnessWeight:     service.WeightTierFairness,
 		TopInfluenceWeight:     service.WeightTopInfluence,

@@ -295,9 +295,10 @@ type CustomGameParticipantVO struct {
 }
 
 type CustomGameConfigurationBalanceVO struct {
-	Fairness     float64 `json:"fairness"`
-	LineFairness float64 `json:"lineFairness"`
-	TierFairness float64 `json:"tierFairness"`
+	Fairness         float64 `json:"fairness"`
+	LineFairness     float64 `json:"lineFairness"`
+	TierFairness     float64 `json:"tierFairness"`
+	LineSatisfaction float64 `json:"lineSatisfaction"`
 }
 
 type CustomGameConfigurationWeightsVO struct {
