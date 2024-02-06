@@ -614,6 +614,7 @@ func FindBalancedCustomGameConfig(
 			for _, x := range subCombinations {
 				combination := append(x, picked)
 				if len(combination) == participantCount && len(result)%50000 == 0 {
+					log.Debugf("combinating... (%d/%d)", len(result), totalProcessibleCount)
 					socket.SocketIO.BroadcastToCustomConfigRoom(
 						configId,
 						socket.EventCustomConfigOptimizeProcess,
@@ -643,6 +644,7 @@ func FindBalancedCustomGameConfig(
 	var highestFairnessConfig map[string]CustomGameTeamParticipantVO = nil
 	for index, teamPositions := range combinations {
 		if index%50000 == 0 {
+			log.Debugf("calculating... (%d/%d)", int64(index)+predictedAllCasesCount, totalProcessibleCount)
 			socket.SocketIO.BroadcastToCustomConfigRoom(
 				configId,
 				socket.EventCustomConfigOptimizeProcess,

@@ -8,12 +8,16 @@ import (
 
 func SetAccessTokenCookie(c *gin.Context, token string, refreshTokenExpireDuration int) {
 	secureMode := !core.DebugMode
-	c.SetSameSite(http.SameSiteNoneMode)
+	if secureMode {
+		c.SetSameSite(http.SameSiteNoneMode)
+	}
 	c.SetCookie("accessToken", token, refreshTokenExpireDuration, "/", "", secureMode, true)
 }
 
 func DeleteAccessTokenCookie(c *gin.Context) {
 	secureMode := !core.DebugMode
-	c.SetSameSite(http.SameSiteNoneMode)
+	if secureMode {
+		c.SetSameSite(http.SameSiteNoneMode)
+	}
 	c.SetCookie("accessToken", "", -1, "/", "", secureMode, true)
 }

@@ -192,9 +192,12 @@ func SanitizeAndLoadDataDragonFile() error {
 			if file == *latestDdragonEntry {
 				continue
 			}
-			if err := os.RemoveAll(fmt.Sprintf("%s/%s", dataDragonDirPath, file.Name())); err != nil {
+			removingDirPath := fmt.Sprintf("%s/%s", dataDragonDirPath, file.Name())
+			log.Debugf("removing old data dragon dir (%s)...", removingDirPath)
+			if err := os.RemoveAll(removingDirPath); err != nil {
 				log.Warnf("failed to remove old data dragon dir (%s)", file.Name())
 			}
+			log.Debugf("remove complete", file.Name())
 		}
 		if len(ddragonEntries) > 1 {
 			log.Debugf("%d old data dragon files removed", len(ddragonEntries)-1)
