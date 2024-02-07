@@ -53,6 +53,13 @@ type SetCustomGameParticipantFavorPositionRequestDto struct {
 	Strength           *int   `json:"strength" binding:"required"`
 }
 
+type SetCustomGameCandidateCustomTierRankRequestDto struct {
+	CustomGameConfigId string  `json:"customGameConfigId" binding:"required"`
+	Puuid              string  `json:"puuid" binding:"required"`
+	Tier               *string `json:"tier"`
+	Rank               *string `json:"rank"`
+}
+
 type OptimizeCustomGameConfigurationRequestDto struct {
 	Id string `json:"id" binding:"required"`
 

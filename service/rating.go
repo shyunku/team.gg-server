@@ -119,6 +119,25 @@ var (
 	//}()
 )
 
+func IsValidTierRank(tier, rank string) bool {
+	ranks, ok := TierRankMap[Tier(tier)]
+	if !ok {
+		return false
+	}
+
+	if len(ranks) == 0 {
+		return rank == ""
+	}
+
+	for _, r := range ranks {
+		if r == Rank(rank) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func CalculateRatingPoint(tier, rank string, lp int) (int64, error) {
 	var ratingPoint int64 = 0
 

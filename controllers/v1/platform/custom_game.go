@@ -30,6 +30,7 @@ func UseCustomGameRouter(r *gin.RouterGroup) {
 	g.POST("/arrange", ArrangeCustomGameParticipant)
 	g.POST("/unarrange", UnarrangeCustomGameParticipant)
 	g.POST("/favor-position", SetCustomGameParticipantFavorPosition)
+	g.POST("/custom-tier-rank", SetCustomGameCandidateCustomTierRank)
 	g.POST("/optimize", OptimizeCustomGameConfiguration)
 
 	g.POST("/arrange-all", SelectMaxCandidates)
@@ -582,6 +583,95 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid target position")
 		return
+	}
+
+	if err := candidateDAO.Upsert(tx); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := service.RecalculateCustomGameBalance(tx, req.CustomGameConfigId); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func SetCustomGameCandidateCustomTierRank(c *gin.Context) {
+	var req SetCustomGameCandidateCustomTierRankRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.CustomGameConfigId, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// check if candidate exists in config
+	candidateDAO, exists, err := models.GetCustomGameCandidateDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusBadRequest, "candidate not found")
+		return
+	}
+
+	if req.Tier == nil && req.Rank == nil {
+		candidateDAO.CustomTier = nil
+		candidateDAO.CustomRank = nil
+	} else {
+		if req.Tier == nil || req.Rank == nil {
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusBadRequest, "invalid tier rank: one of them is nil")
+			return
+		}
+
+		if !service.IsValidTierRank(*req.Tier, *req.Rank) {
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusBadRequest, "invalid tier rank")
+			return
+		}
+
+		// update candidate
+		candidateDAO.CustomTier = req.Tier
+		candidateDAO.CustomRank = req.Rank
 	}
 
 	if err := candidateDAO.Upsert(tx); err != nil {
