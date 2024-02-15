@@ -14,7 +14,7 @@ func GetSummonerRecentMatchSummaryMXDAOs(puuid string, count int) ([]*SummonerMa
 		FROM summoner_matches sm
 		LEFT JOIN matches m ON sm.match_id = m.match_id
 		LEFT JOIN match_participants mp ON mp.match_id = m.match_id AND mp.puuid = sm.puuid
-		WHERE sm.puuid = ?
+		WHERE sm.puuid = ? AND mp.match_id IS NOT NULL
 		ORDER BY m.game_end_timestamp DESC
 		LIMIT ?`, puuid, count,
 	); err != nil {

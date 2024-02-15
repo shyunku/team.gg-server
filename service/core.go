@@ -107,7 +107,7 @@ func renewSummonerInfo(db db.Context, summoner *riot.SummonerDto, account *riot.
 func RenewSummonerLeague(db db.Context, summonerId string, puuid string) error {
 	leagues, err := riot.GetLeaguesBySummonerId(summonerId)
 	if err != nil {
-		log.Warnf("failed to get league by summoner id (%s)", summonerId, puuid)
+		log.Warnf("failed to get league by summoner id (%s) - %s", summonerId, puuid)
 		return err
 	}
 

@@ -37,10 +37,16 @@ func UseCustomGameRouter(r *gin.RouterGroup) {
 	g.POST("/unarrange-all", UnarrangeAllParticipants)
 	g.POST("/swap-team", SwapTeam)
 	g.POST("/shuffle", ShuffleTeam)
+	g.POST("/renew-ranks", RenewRanks)
 }
 
 func GetCustomGameConfigurationList(c *gin.Context) {
 	uid := c.GetString("uid")
+
+	if uid == "" {
+		util.AbortWithStrJson(c, http.StatusUnauthorized, "user not found")
+		return
+	}
 
 	// get all custom games from db
 	resp, err := service.GetCustomGameConfigurationVOs(uid)
@@ -88,7 +94,8 @@ func CreateCustomGameConfiguration(c *gin.Context) {
 		return
 	}
 	if !exists {
-		util.AbortWithStrJson(c, http.StatusBadRequest, "user not found")
+		log.Errorf("user not found: %s", uid)
+		util.AbortWithStrJson(c, http.StatusForbidden, "user not found")
 		return
 	}
 
@@ -1175,5 +1182,77 @@ func ShuffleTeam(c *gin.Context) {
 	}
 
 	socket.SocketIO.MulticastToCustomConfigRoom(req.Id, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func RenewRanks(c *gin.Context) {
+	var req UtilityRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.Id, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// get all participants
+	participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	for _, participantDAO := range participantDAOs {
+		// get summoner info
+		summonerDAO, exists, err := models.GetSummonerDAO_byPuuid(tx, participantDAO.Puuid)
+		if err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		if !exists {
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusNotFound, "summoner not found")
+			return
+		}
+
+		// get rank info
+		if err := service.RenewSummonerLeague(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
 	c.JSON(http.StatusOK, nil)
 }
