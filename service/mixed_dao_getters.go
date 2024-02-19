@@ -96,7 +96,7 @@ func GetChampionStatisticMXDAOs() ([]*ChampionStatisticMXDAO, error) {
 		)
 		SELECT
 			cs.*,
-			bs.total_bans / mc.matches as ban_rate,
+    		IF(ISNULL(bs.total_bans), 0, bs.total_bans / mc.matches) as ban_rate,
 			cs.total / mc.matches as pick_rate
 		FROM ChampionStats cs
 		LEFT JOIN BanStats bs ON cs.champion_id = bs.champion_id
