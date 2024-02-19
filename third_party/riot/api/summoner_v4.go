@@ -1,8 +1,9 @@
-package riot
+package api
 
 import (
 	"encoding/json"
 	"team.gg-server/libs/http"
+	"team.gg-server/third_party/riot"
 )
 
 type SummonerDto struct {
@@ -16,9 +17,9 @@ type SummonerDto struct {
 }
 
 func GetSummonerByName(name string) (*SummonerDto, int, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionKr, "/lol/summoner/v4/summoners/by-name/"+name),
+		Url: riot.CreateUrl(riot.RegionKr, "/lol/summoner/v4/summoners/by-name/"+name),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -35,9 +36,9 @@ func GetSummonerByName(name string) (*SummonerDto, int, error) {
 }
 
 func GetSummonerByPuuid(puuid string) (*SummonerDto, int, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionKr, "/lol/summoner/v4/summoners/by-puuid/"+puuid),
+		Url: riot.CreateUrl(riot.RegionKr, "/lol/summoner/v4/summoners/by-puuid/"+puuid),
 	})
 	if err != nil {
 		return nil, 0, err

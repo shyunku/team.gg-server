@@ -1,15 +1,16 @@
-package riot
+package api
 
 import (
 	"encoding/json"
 	"team.gg-server/libs/http"
+	"team.gg-server/third_party/riot"
 	"time"
 )
 
 type MatchIdsDto []string
 
 func GetMatchIdsInterval(puuid string, start *time.Time, end *time.Time, cnt int) (*MatchIdsDto, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	query := make(map[string]interface{})
 	if start != nil {
 		query["startTime"] = start.Unix()
@@ -21,7 +22,7 @@ func GetMatchIdsInterval(puuid string, start *time.Time, end *time.Time, cnt int
 		query["count"] = cnt
 	}
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrlWithQuery(RegionAsia, "/lol/match/v5/matches/by-puuid/"+puuid+"/ids", query),
+		Url: riot.CreateUrlWithQuery(riot.RegionAsia, "/lol/match/v5/matches/by-puuid/"+puuid+"/ids", query),
 	})
 	if err != nil {
 		return nil, err
@@ -219,9 +220,9 @@ type MatchDto struct {
 }
 
 func GetMatchByMatchId(matchId string) (*MatchDto, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionAsia, "/lol/match/v5/matches/"+matchId),
+		Url: riot.CreateUrl(riot.RegionAsia, "/lol/match/v5/matches/"+matchId),
 	})
 	if err != nil {
 		return nil, err

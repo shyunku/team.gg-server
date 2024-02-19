@@ -126,7 +126,6 @@ func (m *MatchParticipantDAO) Insert(db db.Context) error {
 		return err
 	}
 	return nil
-
 }
 
 func GetMatchParticipantDAOs(db db.Context, matchId string) ([]MatchParticipantDAO, error) {
@@ -139,4 +138,13 @@ func GetMatchParticipantDAOs(db db.Context, matchId string) ([]MatchParticipantD
 		return nil, err
 	}
 	return matchParticipants, nil
+}
+
+func GetRandomMatchParticipantDAO(db db.Context) (*MatchParticipantDAO, error) {
+	var matchParticipant MatchParticipantDAO
+	if err := db.Get(&matchParticipant,
+		"SELECT * FROM match_participants ORDER BY RAND() LIMIT 1"); err != nil {
+		return nil, err
+	}
+	return &matchParticipant, nil
 }

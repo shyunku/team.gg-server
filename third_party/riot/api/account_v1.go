@@ -1,8 +1,9 @@
-package riot
+package api
 
 import (
 	"encoding/json"
 	"team.gg-server/libs/http"
+	"team.gg-server/third_party/riot"
 )
 
 type AccountByRiotIdDto struct {
@@ -12,9 +13,9 @@ type AccountByRiotIdDto struct {
 }
 
 func GetAccountByRiotId(gameName, tagLine string) (*AccountByRiotIdDto, int, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionAsia, "/riot/account/v1/accounts/by-riot-id/"+Encode(gameName)+"/"+Encode(tagLine)),
+		Url: riot.CreateUrl(riot.RegionAsia, "/riot/account/v1/accounts/by-riot-id/"+riot.Encode(gameName)+"/"+riot.Encode(tagLine)),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -32,9 +33,9 @@ func GetAccountByRiotId(gameName, tagLine string) (*AccountByRiotIdDto, int, err
 }
 
 func GetAccountByPuuid(puuid string) (*AccountByRiotIdDto, int, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionAsia, "/riot/account/v1/accounts/by-puuid/"+puuid),
+		Url: riot.CreateUrl(riot.RegionAsia, "/riot/account/v1/accounts/by-puuid/"+puuid),
 	})
 	if err != nil {
 		return nil, 0, err

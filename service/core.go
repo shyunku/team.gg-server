@@ -10,7 +10,7 @@ import (
 	"team.gg-server/controllers/socket"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
-	"team.gg-server/third_party/riot"
+	"team.gg-server/third_party/riot/api"
 	"team.gg-server/util"
 	"time"
 )
@@ -19,35 +19,26 @@ import (
 // you should use db context with transaction (to prevent inconsistency)
 func RenewSummonerTotal(tx *sqlx.Tx, puuid string) error {
 	// update summoner info
-	if err := RenewSummonerInfoByPuuid(tx, puuid); err != nil {
-		log.Error(err)
-		return err
-	}
-
-	// get summoner by puuid in db
-	summonerDao, exists, err := models.GetSummonerDAO_byPuuid(tx, puuid)
+	summonerDAO, err := RenewSummonerInfoByPuuid(tx, puuid)
 	if err != nil {
 		log.Error(err)
 		return err
 	}
-	if !exists {
-		return fmt.Errorf("summoner (%s) doesn't exist", puuid)
-	}
 
 	// update summoner league
-	if err := RenewSummonerLeague(tx, summonerDao.Id, summonerDao.Puuid); err != nil {
+	if err := RenewSummonerLeague(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
 		log.Error(err)
 		return err
 	}
 
 	// update summoner mastery
-	if err := RenewSummonerMastery(tx, summonerDao.Id, summonerDao.Puuid); err != nil {
+	if err := RenewSummonerMastery(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
 		log.Error(err)
 		return err
 	}
 
 	// update summoner recent matches
-	if err := RenewSummonerRecentMatches(tx, summonerDao.Puuid); err != nil {
+	if err := RenewSummonerRecentMatches(tx, summonerDAO.Puuid); err != nil {
 		log.Error(err)
 		return err
 	}
@@ -55,28 +46,29 @@ func RenewSummonerTotal(tx *sqlx.Tx, puuid string) error {
 	return nil
 }
 
-func RenewSummonerInfoByPuuid(db db.Context, puuid string) error {
-	summoner, _, err := riot.GetSummonerByPuuid(puuid)
+func RenewSummonerInfoByPuuid(db db.Context, puuid string) (*models.SummonerDAO, error) {
+	summoner, _, err := api.GetSummonerByPuuid(puuid)
 	if err != nil {
 		log.Error(err)
-		return err
+		return nil, err
 	}
 
-	account, _, err := riot.GetAccountByPuuid(puuid)
+	account, _, err := api.GetAccountByPuuid(puuid)
 	if err != nil {
 		log.Error(err)
-		return err
+		return nil, err
 	}
 
-	if err := renewSummonerInfo(db, summoner, account); err != nil {
+	summonerDAO, err := renewSummonerInfo(db, summoner, account)
+	if err != nil {
 		log.Error(err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return summonerDAO, nil
 }
 
-func renewSummonerInfo(db db.Context, summoner *riot.SummonerDto, account *riot.AccountByRiotIdDto) error {
+func renewSummonerInfo(db db.Context, summoner *api.SummonerDto, account *api.AccountByRiotIdDto) (*models.SummonerDAO, error) {
 	// make new summoner DAO
 	summonerDao := &models.SummonerDAO{
 		AccountId:       summoner.AccountId,
@@ -96,16 +88,16 @@ func renewSummonerInfo(db db.Context, summoner *riot.SummonerDto, account *riot.
 	// insert summoner DAO to db
 	if err := summonerDao.Upsert(db); err != nil {
 		log.Error(err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return summonerDao, nil
 }
 
 // RenewSummonerLeague updates summoner league info
 // this assumes that summoner info is already stored in this context.
 func RenewSummonerLeague(db db.Context, summonerId string, puuid string) error {
-	leagues, err := riot.GetLeaguesBySummonerId(summonerId)
+	leagues, err := api.GetLeaguesBySummonerId(summonerId)
 	if err != nil {
 		log.Warnf("failed to get league by summoner id (%s) - %s", summonerId, puuid)
 		return err
@@ -146,7 +138,7 @@ func RenewSummonerLeague(db db.Context, summonerId string, puuid string) error {
 }
 
 func RenewSummonerMastery(db db.Context, summonerId string, puuid string) error {
-	masteries, err := riot.GetMasteryByPuuid(puuid)
+	masteries, err := api.GetMasteryByPuuid(puuid)
 	if err != nil {
 		log.Warnf("failed to get mastery by summoner id (%s)", summonerId)
 		return err
@@ -180,7 +172,23 @@ func RenewSummonerMastery(db db.Context, summonerId string, puuid string) error 
 }
 
 func RenewSummonerRecentMatches(db db.Context, puuid string) error {
-	matches, err := riot.GetMatchIdsInterval(puuid, nil, nil, LoadInitialMatchCount)
+	matches, err := api.GetMatchIdsInterval(puuid, nil, nil, LoadInitialMatchCount)
+	if err != nil {
+		log.Warnf("failed to get match ids by puuid (%s)", puuid)
+		return err
+	}
+
+	for _, matchId := range *matches {
+		if err := RenewSummonerMatchIfNecessary(db, puuid, matchId); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func RenewSummonerRecentMatchesWithCount(db db.Context, puuid string, cnt int) error {
+	matches, err := api.GetMatchIdsInterval(puuid, nil, nil, cnt)
 	if err != nil {
 		log.Warnf("failed to get match ids by puuid (%s)", puuid)
 		return err
@@ -196,7 +204,7 @@ func RenewSummonerRecentMatches(db db.Context, puuid string) error {
 }
 
 func RenewSummonerMatchesBefore(db db.Context, puuid string, before time.Time) error {
-	matches, err := riot.GetMatchIdsInterval(puuid, nil, &before, LoadMoreMatchCount)
+	matches, err := api.GetMatchIdsInterval(puuid, nil, &before, LoadMoreMatchCount)
 	if err != nil {
 		log.Warnf("failed to get match ids by puuid (%s)", puuid)
 		return err
@@ -221,7 +229,7 @@ func RenewSummonerMatchIfNecessary(db db.Context, puuid string, matchId string) 
 	if !exists {
 		// no match data in local db
 		// get match from riot api
-		match, err := riot.GetMatchByMatchId(matchId)
+		match, err := api.GetMatchByMatchId(matchId)
 		if err != nil {
 			log.Error(err)
 			return err

@@ -102,6 +102,11 @@ func main() {
 	// randomize seed
 	rand.Seed(time.Now().UnixNano())
 
+	// Start data explorer
+	log.Info("Starting data explorer...")
+	de := service.NewDataExplorer()
+	go de.Loop()
+
 	// Run web server with gin
 	controllers.RunGin()
 }

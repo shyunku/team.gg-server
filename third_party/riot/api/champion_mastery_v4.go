@@ -1,8 +1,9 @@
-package riot
+package api
 
 import (
 	"encoding/json"
 	"team.gg-server/libs/http"
+	"team.gg-server/third_party/riot"
 )
 
 type MasteryItemDto struct {
@@ -21,9 +22,9 @@ type MasteryItemDto struct {
 type MasteryDto []MasteryItemDto
 
 func GetMasteryByPuuid(puuid string) (*MasteryDto, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionKr, "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+puuid),
+		Url: riot.CreateUrl(riot.RegionKr, "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+puuid),
 	})
 	if err != nil {
 		return nil, err

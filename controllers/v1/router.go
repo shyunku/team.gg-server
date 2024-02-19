@@ -8,7 +8,7 @@ import (
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/service"
-	"team.gg-server/third_party/riot"
+	"team.gg-server/third_party/riot/api"
 	"team.gg-server/util"
 	"time"
 )
@@ -57,7 +57,7 @@ func GetSummonerInfo(c *gin.Context) {
 			return
 		}
 
-		account, status, err := riot.GetAccountByRiotId(req.GameName, tagLine)
+		account, status, err := api.GetAccountByRiotId(req.GameName, tagLine)
 		if err != nil {
 			if status == http.StatusNotFound {
 				util.AbortWithStrJson(c, http.StatusNotFound, "invalid game name")
@@ -236,7 +236,7 @@ func GetIngameInfo(c *gin.Context) {
 		return
 	}
 
-	spectatorInfo, _, err := riot.GetSpectatorInfo(summonerDAO.Id)
+	spectatorInfo, _, err := api.GetSpectatorInfo(summonerDAO.Id)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")

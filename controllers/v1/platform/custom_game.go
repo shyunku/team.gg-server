@@ -11,7 +11,7 @@ import (
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/service"
-	"team.gg-server/third_party/riot"
+	"team.gg-server/third_party/riot/api"
 	"team.gg-server/util"
 	"time"
 )
@@ -233,7 +233,7 @@ func AddCandidateToCustomGameConfiguration(c *gin.Context) {
 			return
 		}
 
-		account, status, err := riot.GetAccountByRiotId(req.Name, req.TagLine)
+		account, status, err := api.GetAccountByRiotId(req.Name, req.TagLine)
 		if err != nil {
 			if status == http.StatusNotFound {
 				util.AbortWithStrJson(c, http.StatusNotFound, "invalid game name")

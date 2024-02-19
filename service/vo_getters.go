@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	log "github.com/shyunku-libraries/go-logger"
+	"strconv"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 )
@@ -311,4 +312,45 @@ func GetCustomGameConfigurationBalanceVO(customGameConfigId string) (*CustomGame
 
 	fairnessVO := CustomGameConfigurationFairnessMixer(*customGameConfigDAO)
 	return &fairnessVO, nil
+}
+
+func GetChampionStatisticsVOs() ([]ChampionStatisticVO, error) {
+	championStatisticMXDAOs, err := GetChampionStatisticMXDAOs()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	championStatisticsMXDAOmap := make(map[int]*ChampionStatisticMXDAO)
+	for _, championStatisticMXDAO := range championStatisticMXDAOs {
+		championStatisticsMXDAOmap[championStatisticMXDAO.ChampionId] = championStatisticMXDAO
+	}
+
+	championStatisticVOs := make([]ChampionStatisticVO, 0)
+	for key, champion := range Champions {
+		championId, err := strconv.Atoi(key)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+
+		if championStatisticMXDAO, exists := championStatisticsMXDAOmap[championId]; exists {
+			championStatisticVOs = append(championStatisticVOs, ChampionStatisticMixer(*championStatisticMXDAO, champion.Name))
+		} else {
+			championStatisticVOs = append(championStatisticVOs, ChampionStatisticVO{
+				ChampionId:       championId,
+				Win:              0,
+				Total:            0,
+				AvgPickRate:      0,
+				AvgBanRate:       0,
+				AvgMinionsKilled: 0,
+				AvgKills:         0,
+				AvgDeaths:        0,
+				AvgAssists:       0,
+				AvgGoldEarned:    0,
+			})
+		}
+	}
+
+	return championStatisticVOs, nil
 }

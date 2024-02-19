@@ -1,8 +1,9 @@
-package riot
+package api
 
 import (
 	"encoding/json"
 	"team.gg-server/libs/http"
+	"team.gg-server/third_party/riot"
 )
 
 type LeagueItemDto struct {
@@ -30,9 +31,9 @@ type LeagueItemDto struct {
 type LeagueDto []LeagueItemDto
 
 func GetLeaguesBySummonerId(summonerId string) (*LeagueDto, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionKr, "/lol/league/v4/entries/by-summoner/"+summonerId),
+		Url: riot.CreateUrl(riot.RegionKr, "/lol/league/v4/entries/by-summoner/"+summonerId),
 	})
 	if err != nil {
 		return nil, err

@@ -80,3 +80,22 @@ type SummonerMatchSummaryMXDAO struct {
 	GameEndedInSurrender           bool    `db:"game_ended_in_surrender" json:"gameEndedInSurrender"`
 	TeamEarlySurrendered           bool    `db:"team_early_surrendered" json:"teamEarlySurrendered"`
 }
+
+type ChampionStatisticMXDAO struct {
+	ChampionId int `db:"champion_id" json:"championId"`
+	Win        int `db:"win" json:"win"`
+	Total      int `db:"total" json:"total"`
+
+	PickRate float64 `db:"pick_rate" json:"pickRate"`
+	BanRate  float64 `db:"ban_rate" json:"banRate"`
+
+	AvgMinionsKilled float64 `db:"avg_minions_killed" json:"avgMinionsKilled"`
+	AvgKills         float64 `db:"avg_kills" json:"avgKills"`
+	AvgDeaths        float64 `db:"avg_deaths" json:"avgDeaths"`
+	AvgAssists       float64 `db:"avg_assists" json:"avgAssists"`
+	AvgGoldEarned    float64 `db:"avg_gold_earned" json:"avgGoldEarned"`
+}
+
+type ChampionStatisticAdditionalMXDAO struct {
+	Bans int `db:"bans" json:"bans"`
+}

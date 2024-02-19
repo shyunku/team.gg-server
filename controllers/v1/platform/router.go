@@ -9,6 +9,7 @@ func UsePlatformRouter(r *gin.RouterGroup) {
 	g := r.Group("/platform")
 	g.Use(middlewares.UnsafeAuthMiddleware)
 	UseCustomGameRouter(g)
+	UseStatisticsRouter(g)
 
 	g.GET("/tokenTest", TestToken)
 }

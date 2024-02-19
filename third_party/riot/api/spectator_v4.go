@@ -1,8 +1,9 @@
-package riot
+package api
 
 import (
 	"encoding/json"
 	"team.gg-server/libs/http"
+	"team.gg-server/third_party/riot"
 )
 
 type SpectatorParticipantDto struct {
@@ -46,9 +47,9 @@ type SpectatorDto struct {
 }
 
 func GetSpectatorInfo(summonerId string) (*SpectatorDto, int, error) {
-	incrementApiCalls()
+	riot.UpdateRiotApiCalls()
 	resp, err := http.Get(http.GetRequest{
-		Url: CreateUrl(RegionKr, "/lol/spectator/v4/active-games/by-summoner/"+summonerId),
+		Url: riot.CreateUrl(riot.RegionKr, "/lol/spectator/v4/active-games/by-summoner/"+summonerId),
 	})
 	if err != nil {
 		return nil, 0, err

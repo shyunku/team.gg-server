@@ -118,6 +118,23 @@ type IngameParticipantVO struct {
 	SummonerId    string `json:"summonerId"`
 }
 
+type ChampionStatisticVO struct {
+	ChampionId   int    `json:"championId"`
+	ChampionName string `json:"championName"`
+
+	Win   int `json:"win"`
+	Total int `json:"total"`
+
+	AvgPickRate float64 `json:"avgPickRate"`
+	AvgBanRate  float64 `json:"avgBanRate"`
+
+	AvgMinionsKilled float64 `json:"avgMinionsKilled"`
+	AvgKills         float64 `json:"avgKills"`
+	AvgDeaths        float64 `json:"avgDeaths"`
+	AvgAssists       float64 `json:"avgAssists"`
+	AvgGoldEarned    float64 `json:"avgGoldEarned"`
+}
+
 /* ------------------------ Preload VOs ------------------------ */
 
 type ChampionDataVO struct {
