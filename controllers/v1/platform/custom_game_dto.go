@@ -63,8 +63,9 @@ type SetCustomGameCandidateCustomTierRankRequestDto struct {
 type OptimizeCustomGameConfigurationRequestDto struct {
 	Id string `json:"id" binding:"required"`
 
-	LineFairnessWeight *float64 `json:"lineFairnessWeight" binding:"required"`
-	TierFairnessWeight *float64 `json:"tierFairnessWeight" binding:"required"`
+	LineFairnessWeight     *float64 `json:"lineFairnessWeight" binding:"required"`
+	TierFairnessWeight     *float64 `json:"tierFairnessWeight" binding:"required"`
+	LineSatisfactionWeight *float64 `json:"lineSatisfactionWeight" binding:"required"`
 
 	TopInfluenceWeight     *float64 `json:"topInfluenceWeight" binding:"required"`
 	JungleInfluenceWeight  *float64 `json:"jungleInfluenceWeight" binding:"required"`

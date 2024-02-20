@@ -319,8 +319,9 @@ type CustomGameConfigurationBalanceVO struct {
 }
 
 type CustomGameConfigurationWeightsVO struct {
-	LineFairness float64 `json:"lineFairness"`
-	TierFairness float64 `json:"tierFairness"`
+	LineFairness     float64 `json:"lineFairness"`
+	TierFairness     float64 `json:"tierFairness"`
+	LineSatisfaction float64 `json:"lineSatisfaction"`
 
 	TopInfluence     float64 `json:"topInfluence"`
 	JungleInfluence  float64 `json:"jungleInfluence"`

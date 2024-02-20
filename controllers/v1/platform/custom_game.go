@@ -131,6 +131,7 @@ func CreateCustomGameConfiguration(c *gin.Context) {
 		LineSatisfaction:       0,
 		LineFairnessWeight:     service.WeightLineFairness,
 		TierFairnessWeight:     service.WeightTierFairness,
+		LineSatisfactionWeight: service.WeightLineSatisfaction,
 		TopInfluenceWeight:     service.WeightTopInfluence,
 		JungleInfluenceWeight:  service.WeightJungleInfluence,
 		MidInfluenceWeight:     service.WeightMidInfluence,
@@ -761,7 +762,8 @@ func OptimizeCustomGameConfiguration(c *gin.Context) {
 	}
 
 	customGameConfigurationDAO.LineFairnessWeight = *req.LineFairnessWeight
-	customGameConfigurationDAO.TierFairnessWeight = 1 - *req.LineFairnessWeight
+	customGameConfigurationDAO.TierFairnessWeight = *req.TierFairnessWeight
+	customGameConfigurationDAO.LineSatisfactionWeight = 1 - *req.LineFairnessWeight - *req.TierFairnessWeight
 	customGameConfigurationDAO.TopInfluenceWeight = *req.TopInfluenceWeight
 	customGameConfigurationDAO.JungleInfluenceWeight = *req.JungleInfluenceWeight
 	customGameConfigurationDAO.MidInfluenceWeight = *req.MidInfluenceWeight

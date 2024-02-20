@@ -805,9 +805,8 @@ func calculateCustomGameConfigFairness(
 		lineFairness = util.LogisticNormalize(lineScoreDiffSum, 1000)
 	}
 
-	// regularize line satisfaction (0~10) -> (0~1)
+	// regularize line satisfaction (0~10) * 2 -> (0~1)
 	lineSatisfactionScore := lineSatisfaction / 20.0
-	lineSatisfactionWeight := 0.4
 
 	// calculate tierFairness
 	var tierFairness float64 = 0
@@ -823,7 +822,7 @@ func calculateCustomGameConfigFairness(
 		}
 	}
 
-	totalFairness := (lineFairness*weights.LineFairness+tierFairness*weights.TierFairness)*(1-lineSatisfactionWeight) + lineSatisfactionScore*lineSatisfactionWeight
+	totalFairness := lineFairness*weights.LineFairness + tierFairness*weights.TierFairness + lineSatisfactionScore*weights.LineSatisfaction
 
 	//log.Debugf("team1 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team1TopScore, team1JungleScore, team1MidScore, team1AdcScore, team1SupportScore)
 	//log.Debugf("team2 top: %.5f, jungle: %.5f, mid: %.5f, adc: %.5f, support: %.5f", team2TopScore, team2JungleScore, team2MidScore, team2AdcScore, team2SupportScore)

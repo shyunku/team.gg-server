@@ -17,8 +17,9 @@ type CustomGameConfigurationDAO struct {
 	TierFairness     float64   `db:"tier_fairness" json:"tierFairness"`
 	LineSatisfaction float64   `db:"line_satisfaction" json:"lineSatisfaction"`
 
-	LineFairnessWeight float64 `db:"line_fairness_weight" json:"lineFairnessWeight"`
-	TierFairnessWeight float64 `db:"tier_fairness_weight" json:"tierFairnessWeight"`
+	LineFairnessWeight     float64 `db:"line_fairness_weight" json:"lineFairnessWeight"`
+	TierFairnessWeight     float64 `db:"tier_fairness_weight" json:"tierFairnessWeight"`
+	LineSatisfactionWeight float64 `db:"line_satisfaction_weight" json:"lineSatisfactionWeight"`
 
 	TopInfluenceWeight     float64 `db:"top_influence_weight" json:"topInfluenceWeight"`
 	JungleInfluenceWeight  float64 `db:"jungle_influence_weight" json:"jungleInfluenceWeight"`
@@ -31,10 +32,10 @@ func (c *CustomGameConfigurationDAO) Upsert(db db.Context) error {
 	if _, err := db.Exec(`
 	INSERT INTO custom_game_configurations (
 		id, name, creator_uid, created_at, last_updated_at, is_public, fairness, line_fairness, tier_fairness, line_satisfaction,
-		line_fairness_weight, tier_fairness_weight, 
+		line_fairness_weight, tier_fairness_weight, line_satisfaction_weight,
 		top_influence_weight, jungle_influence_weight, mid_influence_weight, adc_influence_weight, support_influence_weight
 	) VALUES (
-		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 	) ON DUPLICATE KEY UPDATE
 	    name = ?,
 		last_updated_at = ?,
@@ -45,16 +46,17 @@ func (c *CustomGameConfigurationDAO) Upsert(db db.Context) error {
 		line_satisfaction = ?,
 		line_fairness_weight = ?,
 		tier_fairness_weight = ?,
+		line_satisfaction_weight = ?,
 		top_influence_weight = ?,
 		jungle_influence_weight = ?,
 		mid_influence_weight = ?,
 		adc_influence_weight = ?,
 		support_influence_weight = ?`,
 		c.Id, c.Name, c.CreatorUid, c.CreatedAt, c.LastUpdatedAt, c.IsPublic, c.Fairness, c.LineFairness, c.TierFairness, c.LineSatisfaction,
-		c.LineFairnessWeight, c.TierFairnessWeight,
+		c.LineFairnessWeight, c.TierFairnessWeight, c.LineSatisfactionWeight,
 		c.TopInfluenceWeight, c.JungleInfluenceWeight, c.MidInfluenceWeight, c.AdcInfluenceWeight, c.SupportInfluenceWeight,
 		c.Name, c.LastUpdatedAt, c.IsPublic, c.Fairness, c.LineFairness, c.TierFairness, c.LineSatisfaction,
-		c.LineFairnessWeight, c.TierFairnessWeight,
+		c.LineFairnessWeight, c.TierFairnessWeight, c.LineSatisfactionWeight,
 		c.TopInfluenceWeight, c.JungleInfluenceWeight, c.MidInfluenceWeight, c.AdcInfluenceWeight, c.SupportInfluenceWeight,
 	); err != nil {
 		return err

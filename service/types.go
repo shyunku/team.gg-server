@@ -16,8 +16,9 @@ const (
 	PositionAdc     = "ADC"
 	PositionSupport = "SUPPORT"
 
-	WeightLineFairness = 0.7
-	WeightTierFairness = 1 - WeightLineFairness
+	WeightLineFairness     = 0.36
+	WeightTierFairness     = 0.24
+	WeightLineSatisfaction = 1 - WeightLineFairness - WeightTierFairness
 
 	WeightTopInfluence     = 0.14
 	WeightJungleInfluence  = 0.23
