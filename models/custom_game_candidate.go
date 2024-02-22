@@ -67,3 +67,12 @@ func GetCustomGameCandidateDAO_byPuuid(db db.Context, customGameConfigId, puuid 
 	}
 	return &customGameCandidateDAO, true, nil
 }
+
+func DeleteCustomGameCandidateDAO_byPuuid(db db.Context, customGameConfigId, puuid string) error {
+	if _, err := db.Exec(`
+		DELETE FROM custom_game_candidates WHERE custom_game_config_id = ? AND puuid = ?
+	`, customGameConfigId, puuid); err != nil {
+		return err
+	}
+	return nil
+}

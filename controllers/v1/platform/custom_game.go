@@ -27,6 +27,8 @@ func UseCustomGameRouter(r *gin.RouterGroup) {
 	g.GET("/balance", GetCustomConfigurationBalance)
 
 	g.PUT("/candidate", AddCandidateToCustomGameConfiguration)
+	g.DELETE("/candidate", DeleteCandidateFromCustomGameConfiguration)
+
 	g.POST("/arrange", ArrangeCustomGameParticipant)
 	g.POST("/unarrange", UnarrangeCustomGameParticipant)
 	g.POST("/favor-position", SetCustomGameParticipantFavorPosition)
@@ -315,6 +317,44 @@ func AddCandidateToCustomGameConfiguration(c *gin.Context) {
 
 	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
 	c.JSON(http.StatusOK, candidateVO)
+}
+
+func DeleteCandidateFromCustomGameConfiguration(c *gin.Context) {
+	var req DeleteCandidateFromCustomGameRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	customGameConfigurationDAO, exists, err := models.GetCustomGameDAO_byId(db.Root, req.CustomGameConfigId)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		util.AbortWithStrJson(c, http.StatusNotFound, "custom game configuration not found")
+		return
+	}
+	if customGameConfigurationDAO.CreatorUid != uid {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	// delete candidate
+	if err := models.DeleteCustomGameCandidateDAO_byPuuid(db.Root, req.CustomGameConfigId, req.Puuid); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.BroadcastToCustomConfigRoom(req.CustomGameConfigId, socket.EventCustomConfigUpdated, nil)
+
+	c.JSON(http.StatusOK, nil)
 }
 
 func ArrangeCustomGameParticipant(c *gin.Context) {

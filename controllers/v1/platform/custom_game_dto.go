@@ -34,6 +34,11 @@ type AddCandidateToCustomGameRequestDto struct {
 
 type AddCandidateToCustomGameResponseDto service.CustomGameCandidateVO
 
+type DeleteCandidateFromCustomGameRequestDto struct {
+	CustomGameConfigId string `form:"customGameConfigId" binding:"required"`
+	Puuid              string `form:"puuid" binding:"required"`
+}
+
 type ArrangeCustomGameParticipantRequestDto struct {
 	CustomGameConfigId string `json:"customGameConfigId" binding:"required"`
 	Puuid              string `json:"puuid" binding:"required"`
