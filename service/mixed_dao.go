@@ -96,6 +96,25 @@ type ChampionStatisticMXDAO struct {
 	AvgGoldEarned    float64 `db:"avg_gold_earned" json:"avgGoldEarned"`
 }
 
-type ChampionStatisticAdditionalMXDAO struct {
-	Bans int `db:"bans" json:"bans"`
+type TierStatisticsTierCountMXDAO struct {
+	QueueType  string `db:"queue_type" json:"queueType"`
+	Tier       string `db:"tier" json:"tier"`
+	LeagueRank string `db:"league_rank" json:"leagueRank"`
+	Count      int    `db:"count" json:"count"`
+}
+
+type TierStatisticsTopRankersMXDAO struct {
+	QueueType  string `db:"queue_type" json:"queueType"`
+	Tier       string `db:"tier" json:"tier"`
+	LeagueRank string `db:"league_rank" json:"leagueRank"`
+
+	Puuid         string `db:"puuid" json:"puuid"`
+	ProfileIconId int    `db:"profile_icon_id" json:"profileIconId"`
+	GameName      string `db:"game_name" json:"gameName"`
+	TagLine       string `db:"tag_line" json:"tagLine"`
+
+	LeaguePoints int `db:"league_points" json:"leaguePoints"`
+	Wins         int `db:"wins" json:"wins"`
+	Losses       int `db:"losses" json:"losses"`
+	Ranks        int `db:"ranks" json:"ranks"`
 }

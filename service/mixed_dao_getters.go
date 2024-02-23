@@ -109,3 +109,65 @@ func GetChampionStatisticMXDAOs() ([]*ChampionStatisticMXDAO, error) {
 	}
 	return statistics, nil
 }
+
+func GetTierStatisticsTierCountMXDAOs() ([]*TierStatisticsTierCountMXDAO, error) {
+	var tierCounts []*TierStatisticsTierCountMXDAO
+	if err := db.Root.Select(&tierCounts, `
+		SELECT l.queue_type, l.tier, l.league_rank, COUNT(*) AS count
+		FROM leagues l
+		LEFT JOIN summoners s ON l.puuid = s.puuid
+		WHERE l.queue_type = 'RANKED_SOLO_5x5' OR l.queue_type = 'RANKED_FLEX_SR'
+		GROUP BY l.queue_type, l.tier, l.league_rank;
+	`); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*TierStatisticsTierCountMXDAO, 0), nil
+		}
+		return nil, err
+	}
+	return tierCounts, nil
+}
+
+func GetTierStatisticsTopRankersMXDAOs(topRanks int) ([]*TierStatisticsTopRankersMXDAO, error) {
+	var topRankers []*TierStatisticsTopRankersMXDAO
+	if err := db.Root.Select(&topRankers, `
+		SELECT
+			l.queue_type,
+			l.tier,
+			l.league_rank,
+			s.puuid,
+			s.profile_icon_id,
+			s.game_name,
+			s.tag_line,
+			l.league_points,
+			l.wins,
+			l.losses,
+			(
+				SELECT COUNT(*)
+				FROM leagues l2
+				WHERE l2.queue_type = l.queue_type
+				AND l2.tier = l.tier
+				AND l2.league_rank = l.league_rank
+				AND (
+					l2.league_points > l.league_points
+					OR (
+					    l2.league_points = l.league_points 
+						AND (
+						    l2.wins > l.wins
+						    OR (l2.wins = l.wins AND l2.losses < l.losses)
+						)
+					)
+				)
+			) AS ranks
+		FROM leagues l
+		LEFT JOIN summoners s ON l.puuid = s.puuid
+		WHERE l.queue_type = 'RANKED_SOLO_5x5' OR l.queue_type = 'RANKED_FLEX_SR'
+		HAVING ranks < ?
+		ORDER BY l.queue_type, l.tier, l.league_rank, ranks ASC;
+	`, topRanks); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*TierStatisticsTopRankersMXDAO, 0), nil
+		}
+		return nil, err
+	}
+	return topRankers, nil
+}

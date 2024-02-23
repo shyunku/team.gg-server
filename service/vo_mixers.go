@@ -194,19 +194,3 @@ func CustomGameConfigurationFairnessMixer(d models.CustomGameConfigurationDAO) C
 		LineSatisfaction: d.LineSatisfaction,
 	}
 }
-
-func ChampionStatisticMixer(d ChampionStatisticMXDAO, championName string) ChampionStatisticVO {
-	return ChampionStatisticVO{
-		ChampionId:       d.ChampionId,
-		ChampionName:     championName,
-		Win:              d.Win,
-		Total:            d.Total,
-		AvgPickRate:      d.PickRate,
-		AvgBanRate:       d.BanRate,
-		AvgMinionsKilled: d.AvgMinionsKilled,
-		AvgKills:         d.AvgKills,
-		AvgDeaths:        d.AvgDeaths,
-		AvgAssists:       d.AvgAssists,
-		AvgGoldEarned:    d.AvgGoldEarned,
-	}
-}

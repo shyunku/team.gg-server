@@ -104,8 +104,13 @@ func main() {
 
 	// Start data explorer
 	log.Info("Starting data explorer...")
-	de := service.NewDataExplorer()
-	go de.Loop()
+	//de := service.NewDataExplorer()
+	//go de.Loop()
+
+	// start statistics repository loop
+	log.Info("Starting statistics repository loops...")
+	go service.ChampionStatisticsRepo.Loop()
+	go service.TierStatisticsRepo.Loop()
 
 	// Run web server with gin
 	controllers.RunGin()
