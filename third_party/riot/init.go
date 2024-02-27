@@ -11,8 +11,6 @@ var (
 	LastApiCallTime time.Time
 )
 
-const ApiCallIdleThreshold = 20 * time.Second
-
 func Init() {
 	apiKey = os.Getenv("RIOT_API_KEY")
 	ApiCalls = 0

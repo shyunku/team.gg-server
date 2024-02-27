@@ -13,6 +13,7 @@ func UseStatisticsRouter(r *gin.RouterGroup) {
 
 	g.GET("/champion", GetChampionStatistics)
 	g.GET("/tier", GetTierStatistics)
+	g.GET("/mastery", GetMasteryStatistics)
 }
 
 func GetChampionStatistics(c *gin.Context) {
@@ -28,6 +29,17 @@ func GetChampionStatistics(c *gin.Context) {
 
 func GetTierStatistics(c *gin.Context) {
 	statistics, err := service.TierStatisticsRepo.Load()
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, statistics)
+}
+
+func GetMasteryStatistics(c *gin.Context) {
+	statistics, err := service.MasteryStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")

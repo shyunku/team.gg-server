@@ -277,6 +277,9 @@ create table leagues
             on update cascade on delete cascade
 );
 
+create index leagues_queue_type_tier_league_rank_league_points_wins_index
+    on leagues (queue_type asc, tier asc, league_rank asc, league_points desc, wins desc);
+
 create table masteries
 (
     puuid                            varchar(255) not null,
@@ -293,6 +296,9 @@ create table masteries
         foreign key (puuid) references summoners (puuid)
             on update cascade on delete cascade
 );
+
+create index masteries_champion_id_champion_points_index
+    on masteries (champion_id asc, champion_points desc);
 
 create table summoner_matches
 (
@@ -328,8 +334,10 @@ create table custom_game_configurations
     fairness                 double                  not null,
     line_fairness            double                  not null,
     tier_fairness            double                  not null,
-    line_fairness_weight     double     default 0.6  not null,
-    tier_fairness_weight     double     default 0.4  not null,
+    line_satisfaction        double                  not null,
+    line_fairness_weight     double     default 0.36 not null,
+    tier_fairness_weight     double     default 0.24 not null,
+    line_satisfaction_weight double     default 0.4  not null,
     top_influence_weight     double     default 0.14 not null,
     jungle_influence_weight  double     default 0.23 not null,
     mid_influence_weight     double     default 0.25 not null,
@@ -357,6 +365,7 @@ create table custom_game_candidates
             on update cascade on delete cascade,
     constraint custom_game_candidates_summoners_puuid_fk
         foreign key (puuid) references summoners (puuid)
+            on update cascade on delete cascade
 );
 
 create table custom_game_participants

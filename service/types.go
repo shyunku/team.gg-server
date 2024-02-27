@@ -1,5 +1,10 @@
 package service
 
+import (
+	"team.gg-server/core"
+	"time"
+)
+
 const (
 	RankTypeSolo = "RANKED_SOLO_5x5"
 	RankTypeFlex = "RANKED_FLEX_SR"
@@ -7,8 +12,13 @@ const (
 	PerkStyleDescriptionTypePrimary = "primaryStyle"
 	PerkStyleDescriptionTypeSub     = "subStyle"
 
-	LoadInitialMatchCount = 10
-	LoadMoreMatchCount    = 5
+	LoadInitialMatchCount    = 20
+	LoadMoreMatchCount       = 20
+	LoadInitialMatchCountDev = 10
+	LoadMoreMatchCountDev    = 5
+
+	DataExplorerLoopPeriod    = 1 * time.Second
+	DataExplorerLoopPeriodDev = 10 * time.Second
 
 	PositionTop     = "TOP"
 	PositionJungle  = "JUNGLE"
@@ -55,5 +65,23 @@ var (
 			{Team: 2, Position: PositionAdc},
 			{Team: 2, Position: PositionSupport},
 		}
+	}
+	GetInitialMatchCount = func() int {
+		if core.DebugMode {
+			return LoadInitialMatchCountDev
+		}
+		return LoadInitialMatchCount
+	}
+	GetLoadMoreMatchCount = func() int {
+		if core.DebugMode {
+			return LoadMoreMatchCountDev
+		}
+		return LoadMoreMatchCount
+	}
+	GetDataExplorerLoopPeriod = func() time.Duration {
+		if core.DebugMode {
+			return DataExplorerLoopPeriodDev
+		}
+		return DataExplorerLoopPeriod
 	}
 )

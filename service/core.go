@@ -172,7 +172,7 @@ func RenewSummonerMastery(db db.Context, summonerId string, puuid string) error 
 }
 
 func RenewSummonerRecentMatches(db db.Context, puuid string) error {
-	matches, err := api.GetMatchIdsInterval(puuid, nil, nil, LoadInitialMatchCount)
+	matches, err := api.GetMatchIdsInterval(puuid, nil, nil, GetInitialMatchCount())
 	if err != nil {
 		log.Warnf("failed to get match ids by puuid (%s)", puuid)
 		return err
@@ -203,8 +203,8 @@ func RenewSummonerRecentMatchesWithCount(db db.Context, puuid string, cnt int) e
 	return nil
 }
 
-func RenewSummonerMatchesBefore(db db.Context, puuid string, before time.Time) error {
-	matches, err := api.GetMatchIdsInterval(puuid, nil, &before, LoadMoreMatchCount)
+func RenewSummonerMatchesBefore(db db.Context, puuid string, before time.Time, count int) error {
+	matches, err := api.GetMatchIdsInterval(puuid, nil, &before, count)
 	if err != nil {
 		log.Warnf("failed to get match ids by puuid (%s)", puuid)
 		return err

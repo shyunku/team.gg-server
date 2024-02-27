@@ -118,3 +118,24 @@ type TierStatisticsTopRankersMXDAO struct {
 	Losses       int `db:"losses" json:"losses"`
 	Ranks        int `db:"ranks" json:"ranks"`
 }
+
+type MasteryStatisticsMXDAO struct {
+	ChampionId    int     `db:"champion_id" json:"championId"`
+	AvgMastery    float64 `db:"avg_mastery" json:"avgMastery"`
+	MaxMastery    int     `db:"max_mastery" json:"maxMastery"`
+	TotalMastery  int     `db:"total_mastery" json:"totalMastery"`
+	MasteredCount int     `db:"mastered_count" json:"masteredCount"`
+	Count         int     `db:"count" json:"count"`
+}
+
+type MasteryStatisticsTopRankersMXDAO struct {
+	Puuid         string `db:"puuid" json:"puuid"`
+	ProfileIconId int    `db:"profile_icon_id" json:"profileIconId"`
+	GameName      string `db:"game_name" json:"gameName"`
+	TagLine       string `db:"tag_line" json:"tagLine"`
+
+	Ranks int `db:"ranks" json:"ranks"`
+
+	ChampionId     int `db:"champion_id" json:"championId"`
+	ChampionPoints int `db:"champion_points" json:"championPoints"`
+}

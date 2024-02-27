@@ -84,3 +84,26 @@ func GetSummonerDAO_byPuuid(db db.Context, puuid string) (*SummonerDAO, bool, er
 	}
 	return &summonerEntity, true, nil
 }
+
+func FindSummonerDAO_byKeyword(db db.Context, keyword string, count int) ([]*SummonerDAO, error) {
+	shortenKeyword := util.ShortenSummonerName(keyword)
+	shortenQuery := "%" + shortenKeyword + "%"
+	keywordQuery := "%" + keyword + "%"
+	var summoners []*SummonerDAO
+	if err := db.Select(&summoners, `
+		SELECT * FROM summoners 
+			 WHERE shorten_game_name LIKE ? 
+				OR shorten_name LIKE ? 
+			    OR game_name LIKE ?
+			    OR name LIKE ?
+				OR tag_line LIKE ? 
+		LIMIT ?`,
+		shortenQuery, shortenQuery,
+		keywordQuery, keywordQuery, keywordQuery, count); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*SummonerDAO, 0), nil
+		}
+		return nil, err
+	}
+	return summoners, nil
+}

@@ -20,6 +20,7 @@ func UseV1Router(r *gin.Engine) {
 	platform.UsePlatformRouter(g)
 
 	g.GET("/summoner", GetSummonerInfo)
+	g.GET("/quickSearch", QuickSearchSummoner)
 	g.POST("/renewSummoner", RenewSummonerInfo)
 	g.POST("/loadMatches", LoadMatches)
 	g.GET("/ingame", GetIngameInfo)
@@ -30,6 +31,7 @@ func GetSummonerInfo(c *gin.Context) {
 	if err := c.ShouldBindQuery(&req); err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
 	}
 
 	tagLine := "KR1"
@@ -124,7 +126,7 @@ func GetSummonerInfo(c *gin.Context) {
 		return
 	}
 
-	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs(summonerDAO.Puuid, service.LoadInitialMatchCount)
+	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs(summonerDAO.Puuid, service.GetInitialMatchCount())
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -142,11 +144,41 @@ func GetSummonerInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func QuickSearchSummoner(c *gin.Context) {
+	var req QuickSearchSummonerRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	summonerDAOs, err := models.FindSummonerDAO_byKeyword(db.Root, req.Keyword, 5)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	resp := make([]service.SummonerSummaryVO, 0)
+	for _, summonerDAO := range summonerDAOs {
+		summaryVO, err := service.GetSummonerSummaryVO_byPuuid(summonerDAO.Puuid)
+		if err != nil {
+			log.Error(err)
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		resp = append(resp, *summaryVO)
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
 func RenewSummonerInfo(c *gin.Context) {
 	var req RenewSummonerInfoRequestDto
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
 	}
 
 	tx, err := db.Root.BeginTxx(c, nil)
@@ -178,6 +210,7 @@ func LoadMatches(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
 	}
 
 	_, exists, err := models.GetOldestSummonerMatchDAO(db.Root, req.Puuid)
@@ -196,7 +229,7 @@ func LoadMatches(c *gin.Context) {
 	} else {
 		// renew matches (before requested time)
 		beforeTime := time.UnixMilli(*req.Before)
-		if err := service.RenewSummonerMatchesBefore(db.Root, req.Puuid, beforeTime); err != nil {
+		if err := service.RenewSummonerMatchesBefore(db.Root, req.Puuid, beforeTime, service.GetLoadMoreMatchCount()); err != nil {
 			log.Error(err)
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 			return
@@ -208,7 +241,7 @@ func LoadMatches(c *gin.Context) {
 		req.Before = &now
 	}
 
-	resp, err := service.GetSummonerMatchSummaryVOs_before(req.Puuid, *req.Before, service.LoadMoreMatchCount)
+	resp, err := service.GetSummonerMatchSummaryVOs_before(req.Puuid, *req.Before, service.GetLoadMoreMatchCount())
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -223,6 +256,7 @@ func GetIngameInfo(c *gin.Context) {
 	if err := c.ShouldBindQuery(&req); err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
 	}
 
 	summonerDAO, exists, err := models.GetSummonerDAO_byPuuid(db.Root, req.Puuid)

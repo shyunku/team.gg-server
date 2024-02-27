@@ -5,7 +5,6 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
-	"team.gg-server/third_party/riot"
 	"time"
 )
 
@@ -23,66 +22,70 @@ func NewDataExplorer() *DataExplorer {
 }
 
 func (de *DataExplorer) Loop() {
+	loopInterval := GetDataExplorerLoopPeriod()
 	for {
-		if time.Since(riot.LastApiCallTime) > riot.ApiCallIdleThreshold {
-			// do something
-			de.Explore()
-		} else {
-			time.Sleep(1 * time.Second)
+		if de.Explore() {
+			time.Sleep(loopInterval)
 		}
 	}
 }
 
-func (de *DataExplorer) finalizeIteration(success bool) {
+func (de *DataExplorer) finalizeExploration(meaningful, success bool) {
 	now := time.Now()
 	de.lastExploredTime = &now
-	de.exploreCaches++
-	if success {
-		de.cacheHit++
+	if meaningful {
+		de.exploreCaches++
+		if success {
+			de.cacheHit++
+		}
 	}
+	log.Debugf("DataExplorer: explored %d/%d", de.cacheHit, de.exploreCaches)
 }
 
-func (de *DataExplorer) Explore() {
-	de.exploreCaches++
-	log.Debugf("DataExplorer: explored %d/%d", de.cacheHit, de.exploreCaches)
-
+func (de *DataExplorer) Explore() bool {
 	var err error
+	var meaningful bool
 	// update something new
-	err = de.fetchNewSummoner()
+	meaningful, err = de.fetchNewSummoner()
 
-	de.finalizeIteration(err == nil)
+	de.finalizeExploration(meaningful, err == nil)
+	return meaningful
 }
 
 func (de *DataExplorer) GetExploreCaches() int {
 	return de.exploreCaches
 }
 
-func (de *DataExplorer) fetchNewSummoner() error {
+func (de *DataExplorer) fetchNewSummoner() (bool, error) {
 	ctx := context.Background()
 	tx, err := db.Root.BeginTxx(ctx, nil)
 	if err != nil {
 		log.Error(err)
-		return err
+		return false, err
 	}
 
 	// get random summoner match
-	participant, err := models.GetRandomMatchParticipantDAO(tx)
+	participant, exists, err := models.GetRandomMatchParticipantDAO(tx)
 	if err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
-		return err
+		return false, err
+	}
+	if !exists {
+		_ = tx.Rollback()
+		return true, nil
 	}
 
 	// search for original summoner
-	_, exists, err := models.GetSummonerDAO_byPuuid(tx, participant.Puuid)
+	_, exists, err = models.GetSummonerDAO_byPuuid(tx, participant.Puuid)
 	if err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
-		return err
+		return false, err
 	}
 	if exists {
 		_ = tx.Rollback()
-		return nil
+		return true, nil
 	}
 
 	// get summoner info
@@ -90,29 +93,36 @@ func (de *DataExplorer) fetchNewSummoner() error {
 	if err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
-		return err
+		return true, err
 	}
 
 	// get summoner rank
 	if err := RenewSummonerLeague(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
-		return err
+		return true, err
 	}
 
 	// get summoner recent matches
 	if err := RenewSummonerRecentMatchesWithCount(tx, summonerDAO.Puuid, 5); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
-		return err
+		return true, err
+	}
+
+	// get summoner mastery
+	if err := RenewSummonerMastery(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		return true, err
 	}
 
 	if err := tx.Commit(); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
-		return err
+		return true, err
 	}
 
-	log.Debugf("DataExplorer: fetched new summoner %s#%s", summonerDAO.GameName, summonerDAO.TagLine)
-	return nil
+	//log.Debugf("DataExplorer: fetched new summoner %s#%s", summonerDAO.GameName, summonerDAO.TagLine)
+	return true, nil
 }

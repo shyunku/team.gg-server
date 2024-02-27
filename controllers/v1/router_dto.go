@@ -30,6 +30,12 @@ type GetSummonerInfoResponseDto struct {
 	Matches  []service.MatchSummaryVO    `json:"matches"`
 }
 
+type QuickSearchSummonerRequestDto struct {
+	Keyword string `form:"keyword" binding:"required"`
+}
+
+type QuickSearchSummonerResponseDto []service.SummonerSummaryVO
+
 type RenewSummonerInfoRequestDto struct {
 	Puuid string `json:"puuid" binding:"required"`
 }
