@@ -63,9 +63,11 @@ type ChampionStatisticsRepository struct {
 }
 
 func NewChampionStatisticsRepository() *ChampionStatisticsRepository {
-	return &ChampionStatisticsRepository{
+	csr := &ChampionStatisticsRepository{
 		Cache: nil,
 	}
+	_, _ = csr.Load()
+	return csr
 }
 
 func (csr *ChampionStatisticsRepository) key() string {
@@ -243,9 +245,11 @@ type TierStatisticsRepository struct {
 }
 
 func NewTierStatisticsRepository() *TierStatisticsRepository {
-	return &TierStatisticsRepository{
+	tsr := &TierStatisticsRepository{
 		Cache: nil,
 	}
+	_, _ = tsr.Load()
+	return tsr
 }
 
 func (tsr *TierStatisticsRepository) key() string {
@@ -469,9 +473,11 @@ type MasteryStatisticsRepository struct {
 }
 
 func NewMasteryStatisticsRepository() *MasteryStatisticsRepository {
-	return &MasteryStatisticsRepository{
+	msr := &MasteryStatisticsRepository{
 		Cache: nil,
 	}
+	_, _ = msr.Load()
+	return msr
 }
 
 func (msr *MasteryStatisticsRepository) key() string {
