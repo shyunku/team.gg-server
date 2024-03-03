@@ -78,7 +78,7 @@ func (csr *ChampionStatisticsRepository) Period() time.Duration {
 	if core.DebugMode {
 		return 10 * time.Second
 	}
-	return 1 * time.Hour
+	return 6 * time.Hour
 }
 
 func (csr *ChampionStatisticsRepository) Loop() {
@@ -279,7 +279,7 @@ func (tsr *TierStatisticsRepository) Period() time.Duration {
 	if core.DebugMode {
 		return 60 * time.Second
 	}
-	return 6 * time.Hour
+	return 12 * time.Hour
 }
 
 func (tsr *TierStatisticsRepository) Loop() {
@@ -526,7 +526,7 @@ func (msr *MasteryStatisticsRepository) Period() time.Duration {
 	if core.DebugMode {
 		return 60 * time.Second
 	}
-	return 6 * time.Hour
+	return 12 * time.Hour
 }
 
 func (msr *MasteryStatisticsRepository) Loop() {
