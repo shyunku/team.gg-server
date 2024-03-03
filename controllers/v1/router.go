@@ -20,6 +20,8 @@ func UseV1Router(r *gin.Engine) {
 	platform.UsePlatformRouter(g)
 
 	g.GET("/summoner", GetSummonerInfo)
+	g.GET("/summoner-by-puuid", GetSummonerInfoByPuuid)
+	g.GET("/matches", GetMatches)
 	g.GET("/quickSearch", QuickSearchSummoner)
 	g.POST("/renewSummoner", RenewSummonerInfo)
 	g.POST("/loadMatches", LoadMatches)
@@ -62,7 +64,7 @@ func GetSummonerInfo(c *gin.Context) {
 		account, status, err := api.GetAccountByRiotId(req.GameName, tagLine)
 		if err != nil {
 			if status == http.StatusNotFound {
-				util.AbortWithStrJson(c, http.StatusNotFound, "invalid game name")
+				util.AbortWithStrJson(c, http.StatusNotFound, "invalid game name: "+req.GameName+" "+tagLine)
 				return
 			}
 			log.Error(err)
@@ -126,7 +128,7 @@ func GetSummonerInfo(c *gin.Context) {
 		return
 	}
 
-	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs(summonerDAO.Puuid, service.GetInitialMatchCount())
+	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs(summonerDAO.Puuid, service.QueueTypeAll, service.GetInitialMatchCount())
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -142,6 +144,80 @@ func GetSummonerInfo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func GetSummonerInfoByPuuid(c *gin.Context) {
+	var req GetSummonerInfoByPuuidRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	summonerDAO, exists, err := models.GetSummonerDAO_byPuuid(db.Root, req.Puuid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		// find summoner by puuid on riot
+		summonerDAO, exists, err = service.RenewSummonerInfoByPuuid(db.Root, req.Puuid)
+		if err != nil {
+			log.Error(err)
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		if !exists {
+			util.AbortWithStrJson(c, http.StatusNotFound, "account/summoner not found")
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, summonerDAO)
+}
+
+func GetMatches(c *gin.Context) {
+	var req GetMatchesRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	var queueType int
+	if req.QueueId == nil {
+		queueType = service.QueueTypeAll
+	} else {
+		queueType = *req.QueueId
+	}
+
+	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs(req.Puuid, queueType, service.GetInitialMatchCount())
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if len(matchesVOs) < 20 {
+		if err := service.RenewSummonerMatches(db.Root, req.Puuid, &api.MatchIdsReqOption{
+			Count:   service.GetInitialMatchCount(),
+			QueueId: queueType,
+		}); err != nil {
+			log.Error(err)
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		matchesVOs, err = service.GetSummonerRecentMatchSummaryVOs(req.Puuid, queueType, service.GetInitialMatchCount())
+		if err != nil {
+			log.Error(err)
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, matchesVOs)
 }
 
 func QuickSearchSummoner(c *gin.Context) {
@@ -213,6 +289,13 @@ func LoadMatches(c *gin.Context) {
 		return
 	}
 
+	var queueType int
+	if req.QueueId == nil {
+		queueType = service.QueueTypeAll
+	} else {
+		queueType = *req.QueueId
+	}
+
 	_, exists, err := models.GetOldestSummonerMatchDAO(db.Root, req.Puuid)
 	if err != nil {
 		log.Error(err)
@@ -221,7 +304,9 @@ func LoadMatches(c *gin.Context) {
 	}
 	if !exists {
 		// just renew matches (recent)
-		if err := service.RenewSummonerRecentMatches(db.Root, req.Puuid); err != nil {
+		if err := service.RenewSummonerMatches(db.Root, req.Puuid, &api.MatchIdsReqOption{
+			QueueId: queueType,
+		}); err != nil {
 			log.Error(err)
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 			return
@@ -229,7 +314,11 @@ func LoadMatches(c *gin.Context) {
 	} else {
 		// renew matches (before requested time)
 		beforeTime := time.UnixMilli(*req.Before)
-		if err := service.RenewSummonerMatchesBefore(db.Root, req.Puuid, beforeTime, service.GetLoadMoreMatchCount()); err != nil {
+		if err := service.RenewSummonerMatches(db.Root, req.Puuid, &api.MatchIdsReqOption{
+			QueueId: queueType,
+			Count:   service.GetLoadMoreMatchCount(),
+			EndTime: &beforeTime,
+		}); err != nil {
 			log.Error(err)
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 			return

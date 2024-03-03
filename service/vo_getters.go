@@ -69,8 +69,8 @@ func GetSummonerMasteryVOs(puuid string) ([]SummonerMasteryVO, error) {
 	return masteryVos, nil
 }
 
-func GetSummonerRecentMatchSummaryVOs(puuid string, count int) ([]MatchSummaryVO, error) {
-	matchSummaryMXDAOs, err := GetSummonerRecentMatchSummaryMXDAOs(puuid, count)
+func GetSummonerRecentMatchSummaryVOs(puuid string, queueId, count int) ([]MatchSummaryVO, error) {
+	matchSummaryMXDAOs, err := GetSummonerRecentMatchSummaryMXDAOs_byQueueId(puuid, queueId, count)
 	if err != nil {
 		log.Error(err)
 		return nil, err

@@ -9,17 +9,30 @@ import (
 
 type MatchIdsDto []string
 
-func GetMatchIdsInterval(puuid string, start *time.Time, end *time.Time, cnt int) (*MatchIdsDto, error) {
+type MatchIdsReqOption struct {
+	QueueId   int
+	MatchType *string
+	Count     int
+	StartTime *time.Time
+	EndTime   *time.Time
+}
+
+func GetMatchIdsInterval(puuid string, opt *MatchIdsReqOption) (*MatchIdsDto, error) {
 	riot.UpdateRiotApiCalls()
 	query := make(map[string]interface{})
-	if start != nil {
-		query["startTime"] = start.Unix()
-	}
-	if end != nil {
-		query["endTime"] = end.Unix()
-	}
-	if cnt > 0 {
-		query["count"] = cnt
+	if opt != nil {
+		if opt.StartTime != nil {
+			query["startTime"] = opt.StartTime.Unix()
+		}
+		if opt.EndTime != nil {
+			query["endTime"] = opt.EndTime.Unix()
+		}
+		if opt.QueueId != 0 {
+			query["queue"] = opt.QueueId
+		}
+		if opt.Count != 0 {
+			query["count"] = opt.Count
+		}
 	}
 	resp, err := http.Get(http.GetRequest{
 		Url: riot.CreateUrlWithQuery(riot.RegionAsia, "/lol/match/v5/matches/by-puuid/"+puuid+"/ids", query),

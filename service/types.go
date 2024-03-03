@@ -13,12 +13,13 @@ const (
 	PerkStyleDescriptionTypeSub     = "subStyle"
 
 	LoadInitialMatchCount    = 20
-	LoadMoreMatchCount       = 20
+	LoadMoreMatchCount       = 10
 	LoadInitialMatchCountDev = 10
 	LoadMoreMatchCountDev    = 5
 
-	DataExplorerLoopPeriod    = 1 * time.Second
-	DataExplorerLoopPeriodDev = 10 * time.Second
+	DataExplorerLoopPeriod       = 1 * time.Second
+	DataExplorerLoopPeriodDev    = 10 * time.Second
+	DataExplorerLoadMatchesCount = 5
 
 	PositionTop     = "TOP"
 	PositionJungle  = "JUNGLE"
@@ -35,6 +36,16 @@ const (
 	WeightMidInfluence     = 0.25
 	WeightAdcInfluence     = 0.21
 	WeightSupportInfluence = 1 - WeightTopInfluence - WeightJungleInfluence - WeightMidInfluence - WeightAdcInfluence
+
+	QueueTypeAll         = 0   // 전체
+	QueueTypeNormalDraft = 400 // 일반 (드래프트)
+	QueueTypeSolo        = 420 // 솔랭
+	QueueTypeNormal      = 430 // 일반
+	QueueTypeFlex        = 440 // 자유 5:5 랭크
+	QueueTypeAram        = 450 // 칼바람
+	QueueTypeClash       = 700 // 클래시
+	QueueTypeUrf         = 900 // 우르프
+	QueueTypePoro        = 920 // 포로왕?
 
 	MatchDecoTypeFirstBloodKill     = "FIRST_BLOOD"
 	MatchDecoTypeHighestDamage      = "HIGHEST_DAMAGE"

@@ -30,6 +30,15 @@ type GetSummonerInfoResponseDto struct {
 	Matches  []service.MatchSummaryVO    `json:"matches"`
 }
 
+type GetSummonerInfoByPuuidRequestDto struct {
+	Puuid string `form:"puuid" binding:"required"`
+}
+
+type GetMatchesRequestDto struct {
+	Puuid   string `form:"puuid" binding:"required"`
+	QueueId *int   `form:"queueId" binding:"required"`
+}
+
 type QuickSearchSummonerRequestDto struct {
 	Keyword string `form:"keyword" binding:"required"`
 }
@@ -41,8 +50,9 @@ type RenewSummonerInfoRequestDto struct {
 }
 
 type LoadMatchesRequestDto struct {
-	Puuid  string `json:"puuid" binding:"required"`
-	Before *int64 `json:"before" binding:"required"`
+	Puuid   string `json:"puuid" binding:"required"`
+	Before  *int64 `json:"before" binding:"required"`
+	QueueId *int   `json:"queueId" binding:"required"`
 }
 
 type LoadMatchesResponseDto []service.MatchSummaryVO

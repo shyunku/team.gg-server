@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	log "github.com/shyunku-libraries/go-logger"
 	"math"
+	"net/http"
 	"team.gg-server/controllers/socket"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
@@ -19,7 +20,7 @@ import (
 // you should use db context with transaction (to prevent inconsistency)
 func RenewSummonerTotal(tx *sqlx.Tx, puuid string) error {
 	// update summoner info
-	summonerDAO, err := RenewSummonerInfoByPuuid(tx, puuid)
+	summonerDAO, _, err := RenewSummonerInfoByPuuid(tx, puuid)
 	if err != nil {
 		log.Error(err)
 		return err
@@ -38,7 +39,7 @@ func RenewSummonerTotal(tx *sqlx.Tx, puuid string) error {
 	}
 
 	// update summoner recent matches
-	if err := RenewSummonerRecentMatches(tx, summonerDAO.Puuid); err != nil {
+	if err := RenewSummonerMatches(tx, summonerDAO.Puuid, nil); err != nil {
 		log.Error(err)
 		return err
 	}
@@ -46,26 +47,32 @@ func RenewSummonerTotal(tx *sqlx.Tx, puuid string) error {
 	return nil
 }
 
-func RenewSummonerInfoByPuuid(db db.Context, puuid string) (*models.SummonerDAO, error) {
-	summoner, _, err := api.GetSummonerByPuuid(puuid)
+func RenewSummonerInfoByPuuid(db db.Context, puuid string) (*models.SummonerDAO, bool, error) {
+	summoner, status, err := api.GetSummonerByPuuid(puuid)
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		if status == http.StatusNotFound {
+			return nil, false, fmt.Errorf("summoner not found with puuid (%s)", puuid)
+		}
+		return nil, true, err
 	}
 
-	account, _, err := api.GetAccountByPuuid(puuid)
+	account, status, err := api.GetAccountByPuuid(puuid)
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		if status == http.StatusNotFound {
+			return nil, false, fmt.Errorf("account not found with puuid (%s)", puuid)
+		}
+		return nil, true, err
 	}
 
 	summonerDAO, err := renewSummonerInfo(db, summoner, account)
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		return nil, true, err
 	}
 
-	return summonerDAO, nil
+	return summonerDAO, true, nil
 }
 
 func renewSummonerInfo(db db.Context, summoner *api.SummonerDto, account *api.AccountByRiotIdDto) (*models.SummonerDAO, error) {
@@ -171,8 +178,8 @@ func RenewSummonerMastery(db db.Context, summonerId string, puuid string) error 
 	return nil
 }
 
-func RenewSummonerRecentMatches(db db.Context, puuid string) error {
-	matches, err := api.GetMatchIdsInterval(puuid, nil, nil, GetInitialMatchCount())
+func RenewSummonerMatches(db db.Context, puuid string, option *api.MatchIdsReqOption) error {
+	matches, err := api.GetMatchIdsInterval(puuid, option)
 	if err != nil {
 		log.Warnf("failed to get match ids by puuid (%s)", puuid)
 		return err
@@ -183,39 +190,6 @@ func RenewSummonerRecentMatches(db db.Context, puuid string) error {
 			return err
 		}
 	}
-
-	return nil
-}
-
-func RenewSummonerRecentMatchesWithCount(db db.Context, puuid string, cnt int) error {
-	matches, err := api.GetMatchIdsInterval(puuid, nil, nil, cnt)
-	if err != nil {
-		log.Warnf("failed to get match ids by puuid (%s)", puuid)
-		return err
-	}
-
-	for _, matchId := range *matches {
-		if err := RenewSummonerMatchIfNecessary(db, puuid, matchId); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func RenewSummonerMatchesBefore(db db.Context, puuid string, before time.Time, count int) error {
-	matches, err := api.GetMatchIdsInterval(puuid, nil, &before, count)
-	if err != nil {
-		log.Warnf("failed to get match ids by puuid (%s)", puuid)
-		return err
-	}
-
-	for _, matchId := range *matches {
-		if err := RenewSummonerMatchIfNecessary(db, puuid, matchId); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
+	"team.gg-server/third_party/riot/api"
 	"time"
 )
 
@@ -89,7 +90,7 @@ func (de *DataExplorer) fetchNewSummoner() (bool, error) {
 	}
 
 	// get summoner info
-	summonerDAO, err := RenewSummonerInfoByPuuid(tx, participant.Puuid)
+	summonerDAO, _, err := RenewSummonerInfoByPuuid(tx, participant.Puuid)
 	if err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
@@ -104,7 +105,10 @@ func (de *DataExplorer) fetchNewSummoner() (bool, error) {
 	}
 
 	// get summoner recent matches
-	if err := RenewSummonerRecentMatchesWithCount(tx, summonerDAO.Puuid, 5); err != nil {
+	if err := RenewSummonerMatches(tx, summonerDAO.Puuid, &api.MatchIdsReqOption{
+		QueueId: QueueTypeAll,
+		Count:   DataExplorerLoadMatchesCount,
+	}); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
 		return true, err
