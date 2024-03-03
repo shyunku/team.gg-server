@@ -133,39 +133,38 @@ func GetTierStatisticsTierCountMXDAOs() ([]*TierStatisticsTierCountMXDAO, error)
 func GetTierStatisticsTopRankersMXDAOs(topRanks int) ([]*TierStatisticsTopRankersMXDAO, error) {
 	var topRankers []*TierStatisticsTopRankersMXDAO
 	if err := db.Root.Select(&topRankers, `
+		WITH RankedLeagues AS (
+			SELECT
+				l.queue_type,
+				l.tier,
+				l.league_rank,
+				l.puuid,
+				l.league_points,
+				l.wins,
+				l.losses,
+				ROW_NUMBER() OVER (
+					PARTITION BY l.queue_type, l.tier, l.league_rank
+					ORDER BY l.league_points DESC, l.wins, l.losses
+				) AS ranks
+			FROM leagues l
+			WHERE l.queue_type = 'RANKED_SOLO_5x5' OR l.queue_type = 'RANKED_FLEX_SR'
+		)
 		SELECT
-			l.queue_type,
-			l.tier,
-			l.league_rank,
+			rl.queue_type,
+			rl.tier,
+			rl.league_rank,
 			s.puuid,
 			s.profile_icon_id,
 			s.game_name,
 			s.tag_line,
-			l.league_points,
-			l.wins,
-			l.losses,
-			(
-				SELECT COUNT(*)
-				FROM leagues l2
-				WHERE l2.queue_type = l.queue_type
-				AND l2.tier = l.tier
-				AND l2.league_rank = l.league_rank
-				AND (
-					l2.league_points > l.league_points
-					OR (
-					    l2.league_points = l.league_points 
-						AND (
-						    l2.wins > l.wins
-						    OR (l2.wins = l.wins AND l2.losses < l.losses)
-						)
-					)
-				)
-			) AS ranks
-		FROM leagues l
-		LEFT JOIN summoners s ON l.puuid = s.puuid
-		WHERE l.queue_type = 'RANKED_SOLO_5x5' OR l.queue_type = 'RANKED_FLEX_SR'
-		HAVING ranks < ?
-		ORDER BY l.queue_type, l.tier, l.league_rank, ranks ASC;
+			rl.league_points,
+			rl.wins,
+			rl.losses,
+			rl.ranks
+		FROM RankedLeagues rl
+		LEFT JOIN summoners s ON rl.puuid = s.puuid
+		WHERE rl.ranks <= ?
+		ORDER BY rl.queue_type, rl.tier, rl.league_rank, rl.ranks ASC;
 	`, topRanks); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return make([]*TierStatisticsTopRankersMXDAO, 0), nil

@@ -150,6 +150,7 @@ func (csr *ChampionStatisticsRepository) Collect() (*ChampionStatistics, error) 
 		Data:      stats,
 	}
 
+	log.Debugf("%s data collected successfully", csr.key())
 	if err := csr.Save(); err != nil {
 		log.Warn(err)
 	}
@@ -188,16 +189,34 @@ func (csr *ChampionStatisticsRepository) Save() error {
 }
 
 func (csr *ChampionStatisticsRepository) Load() (*ChampionStatistics, error) {
+	if csr.Cache != nil {
+		return csr.Cache, nil
+	}
+
 	// if there is no data, collect and save
 	filePath := keyPath(csr.key())
 	_, err := os.Stat(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Debugf("file not found: %s", filePath)
+			return csr.Collect()
+		}
 		log.Error(err)
 		return nil, nil
 	}
-	if os.IsNotExist(err) {
-		log.Debugf("file not found: %s", filePath)
-		return csr.Collect()
+
+	// read file
+	jsonData, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	// unmarshal data
+	err = json.Unmarshal(jsonData, &csr.Cache)
+	if err != nil {
+		log.Error(err)
+		return nil, err
 	}
 
 	return csr.Cache, nil
@@ -385,6 +404,7 @@ func (tsr *TierStatisticsRepository) Collect() (*TierStatistics, error) {
 		QueueGroups: queueGroups,
 	}
 
+	log.Debugf("%s data collected successfully", tsr.key())
 	if err := tsr.Save(); err != nil {
 		log.Warn(err)
 	}
@@ -423,16 +443,34 @@ func (tsr *TierStatisticsRepository) Save() error {
 }
 
 func (tsr *TierStatisticsRepository) Load() (*TierStatistics, error) {
+	if tsr.Cache != nil {
+		return tsr.Cache, nil
+	}
+
 	// if there is no data, collect and save
 	filePath := keyPath(tsr.key())
 	_, err := os.Stat(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Debugf("file not found: %s", filePath)
+			return tsr.Collect()
+		}
 		log.Error(err)
 		return nil, nil
 	}
-	if os.IsNotExist(err) {
-		log.Debugf("file not found: %s", filePath)
-		return tsr.Collect()
+
+	// read file
+	jsonData, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	// unmarshal data
+	err = json.Unmarshal(jsonData, &tsr.Cache)
+	if err != nil {
+		log.Error(err)
+		return nil, err
 	}
 
 	return tsr.Cache, nil
@@ -564,6 +602,7 @@ func (msr *MasteryStatisticsRepository) Collect() (*MasteryStatistics, error) {
 		msr.Cache.MasteryGroups = append(msr.Cache.MasteryGroups, mastery)
 	}
 
+	log.Debugf("%s data collected successfully", msr.key())
 	if err := msr.Save(); err != nil {
 		log.Warn(err)
 	}
@@ -602,17 +641,34 @@ func (msr *MasteryStatisticsRepository) Save() error {
 }
 
 func (msr *MasteryStatisticsRepository) Load() (*MasteryStatistics, error) {
+	if msr.Cache != nil {
+		return msr.Cache, nil
+	}
+
 	// if there is no data, collect and save
 	filePath := keyPath(msr.key())
 	_, err := os.Stat(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Debugf("file not found: %s", filePath)
+			return msr.Collect()
+		}
 		log.Error(err)
 		return nil, nil
 	}
 
-	if os.IsNotExist(err) {
-		log.Debugf("file not found: %s", filePath)
-		return msr.Collect()
+	// read file
+	jsonData, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	// unmarshal data
+	err = json.Unmarshal(jsonData, &msr.Cache)
+	if err != nil {
+		log.Error(err)
+		return nil, err
 	}
 
 	return msr.Cache, nil
