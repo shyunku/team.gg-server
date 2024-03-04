@@ -18,7 +18,7 @@ const (
 	LoadMoreMatchCountDev    = 5
 
 	DataExplorerLoopPeriod       = 1 * time.Second
-	DataExplorerLoopPeriodDev    = 10 * time.Second
+	DataExplorerLoopPeriodDev    = 60 * time.Second
 	DataExplorerLoadMatchesCount = 5
 
 	PositionTop     = "TOP"

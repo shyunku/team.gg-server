@@ -185,286 +185,122 @@ func RenewSummonerMatches(db db.Context, puuid string, option *api.MatchIdsReqOp
 		return err
 	}
 
-	for _, matchId := range *matches {
-		if err := RenewSummonerMatchIfNecessary(db, puuid, matchId); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func RenewSummonerMatchIfNecessary(db db.Context, puuid string, matchId string) error {
-	matchDAO, exists, err := models.GetMatchDAO(db, matchId)
-	if err != nil {
+	if err := RenewSummonerMatchesIfNecessary(db, puuid, *matches); err != nil {
 		log.Error(err)
 		return err
 	}
 
-	if !exists {
-		// no match data in local db
-		// get match from riot api
-		match, err := api.GetMatchByMatchId(matchId)
+	return nil
+}
+
+type riotSummonerMatchResult struct {
+	match *api.MatchDto
+	err   error
+}
+
+func RenewSummonerMatchesIfNecessary(db db.Context, puuid string, matchIdList []string) error {
+	cachedMatchIds := make([]string, 0)
+	uncachedMatchIds := make([]string, 0)
+	for _, matchId := range matchIdList {
+		_, exists, err := models.GetMatchDAO(db, matchId)
 		if err != nil {
 			log.Error(err)
 			return err
 		}
-
-		// insert match into db
-		matchDAO = &models.MatchDAO{
-			MatchId:            matchId,
-			DataVersion:        match.Metadata.DataVersion,
-			GameCreation:       match.Info.GameCreation,
-			GameDuration:       match.Info.GameDuration,
-			GameEndTimestamp:   match.Info.GameEndTimestamp,
-			GameId:             match.Info.GameId,
-			GameMode:           match.Info.GameMode,
-			GameName:           match.Info.GameName,
-			GameStartTimestamp: match.Info.GameStartTimestamp,
-			GameType:           match.Info.GameType,
-			GameVersion:        match.Info.GameVersion,
-			MapId:              match.Info.MapId,
-			PlatformId:         match.Info.PlatformId,
-			QueueId:            match.Info.QueueId,
-			TournamentCode:     match.Info.TournamentCode,
+		if exists {
+			cachedMatchIds = append(cachedMatchIds, matchId)
+		} else {
+			uncachedMatchIds = append(uncachedMatchIds, matchId)
 		}
-		if err := matchDAO.Insert(db); err != nil {
+	}
+
+	if len(uncachedMatchIds) > 0 {
+		timer := util.NewTimerWithName("summoner_match_renewal")
+		timer.Start()
+		resultChan := make(chan riotSummonerMatchResult, len(uncachedMatchIds))
+		for _, matchId := range uncachedMatchIds {
+			go fetchSummonerMatchesFromRiot(matchId, resultChan)
+		}
+
+		uncachedMatches := make([]*api.MatchDto, 0)
+		for range uncachedMatchIds {
+			result := <-resultChan
+			if result.err != nil {
+				log.Error(result.err)
+				return result.err
+			} else if result.match != nil {
+				//log.Debugf("<- found match (%s) from riot", result.match.Metadata.MatchId)
+				uncachedMatches = append(uncachedMatches, result.match)
+			}
+		}
+		log.Debugf("Fetched %d uncached matches in %s", len(uncachedMatchIds), timer.GetDurationString())
+
+		for _, match := range uncachedMatches {
+			if err := saveMatchToLocalDB(db, puuid, match); err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+
+	for _, match := range cachedMatchIds {
+		if err := renewMatchInLocalDB(db, puuid, match); err != nil {
 			log.Error(err)
 			return err
 		}
+	}
 
-		// insert new match participants
-		for _, p := range match.Info.Participants {
-			matchParticipantId := uuid.New().String()
+	return nil
+}
 
-			if p.Puuid == puuid {
-				// insert new summoner match (upsert)
-				summonerMatchEntity := models.SummonerMatchDAO{
-					Puuid:   p.Puuid,
-					MatchId: matchId,
-				}
-				if err := summonerMatchEntity.Upsert(db); err != nil {
-					log.Error(err)
-					return err
-				}
-			}
-
-			// insert new match participant
-			matchParticipantEntity := models.MatchParticipantDAO{
-				MatchId:                        matchId,
-				ParticipantId:                  p.ParticipantId,
-				MatchParticipantId:             matchParticipantId,
-				Puuid:                          p.Puuid,
-				Kills:                          p.Kills,
-				Deaths:                         p.Deaths,
-				Assists:                        p.Assists,
-				ChampionId:                     p.ChampionId,
-				ChampionLevel:                  p.ChampLevel,
-				ChampionName:                   p.ChampionName,
-				ChampExperience:                p.ChampExperience,
-				SummonerLevel:                  p.SummonerLevel,
-				SummonerName:                   p.SummonerName,
-				RiotIdName:                     p.RiotIdGameName,
-				RiotIdTagLine:                  p.RiotIdTagline,
-				ProfileIcon:                    p.ProfileIcon,
-				MagicDamageDealtToChampions:    p.MagicDamageDealtToChampions,
-				PhysicalDamageDealtToChampions: p.PhysicalDamageDealtToChampions,
-				TrueDamageDealtToChampions:     p.TrueDamageDealtToChampions,
-				TotalDamageDealtToChampions:    p.TotalDamageDealtToChampions,
-				MagicDamageTaken:               p.MagicDamageTaken,
-				PhysicalDamageTaken:            p.PhysicalDamageTaken,
-				TrueDamageTaken:                p.TrueDamageTaken,
-				TotalDamageTaken:               p.TotalDamageTaken,
-				TotalHeal:                      p.TotalHeal,
-				TotalHealsOnTeammates:          p.TotalHealsOnTeammates,
-				Item0:                          p.Item0,
-				Item1:                          p.Item1,
-				Item2:                          p.Item2,
-				Item3:                          p.Item3,
-				Item4:                          p.Item4,
-				Item5:                          p.Item5,
-				Item6:                          p.Item6,
-				Spell1Casts:                    p.Spell1Casts,
-				Spell2Casts:                    p.Spell2Casts,
-				Spell3Casts:                    p.Spell3Casts,
-				Spell4Casts:                    p.Spell4Casts,
-				Summoner1Casts:                 p.Summoner1Casts,
-				Summoner1Id:                    p.Summoner1Id,
-				Summoner2Casts:                 p.Summoner2Casts,
-				Summoner2Id:                    p.Summoner2Id,
-				FirstBloodAssist:               p.FirstBloodAssist,
-				FirstBloodKill:                 p.FirstBloodKill,
-				DoubleKills:                    p.DoubleKills,
-				TripleKills:                    p.TripleKills,
-				QuadraKills:                    p.QuadraKills,
-				PentaKills:                     p.PentaKills,
-				TotalMinionsKilled:             p.TotalMinionsKilled,
-				TotalTimeCCDealt:               p.TotalTimeCCDealt,
-				NeutralMinionsKilled:           p.NeutralMinionsKilled,
-				GoldSpent:                      p.GoldSpent,
-				GoldEarned:                     p.GoldEarned,
-				IndividualPosition:             p.IndividualPosition,
-				TeamPosition:                   p.TeamPosition,
-				Lane:                           p.Lane,
-				Role:                           p.Role,
-				TeamId:                         p.TeamId,
-				VisionScore:                    p.VisionScore,
-				Win:                            p.Win,
-				GameEndedInEarlySurrender:      p.GameEndedInEarlySurrender,
-				GameEndedInSurrender:           p.GameEndedInSurrender,
-				TeamEarlySurrendered:           p.TeamEarlySurrendered,
-			}
-			if err := matchParticipantEntity.Insert(db); err != nil {
-				log.Error(err)
-				return err
-			}
-
-			// insert new match participant detail
-			matchParticipantDetailEntity := models.MatchParticipantDetailDAO{
-				MatchParticipantId:             matchParticipantId,
-				MatchId:                        matchId,
-				BaronKills:                     p.BaronKills,
-				BountyLevel:                    p.BountyLevel,
-				ChampionTransform:              p.ChampionTransform,
-				ConsumablesPurchased:           p.ConsumablesPurchased,
-				DamageDealtToBuildings:         p.DamageDealtToBuildings,
-				DamageDealtToObjectives:        p.DamageDealtToObjectives,
-				DamageDealtToTurrets:           p.DamageDealtToTurrets,
-				DamageSelfMitigated:            p.DamageSelfMitigated,
-				DetectorWardsPlaced:            p.DetectorWardsPlaced,
-				DragonKills:                    p.DragonKills,
-				PhysicalDamageDealt:            p.PhysicalDamageDealt,
-				MagicDamageDealt:               p.MagicDamageDealt,
-				TotalDamageDealt:               p.TotalDamageDealt,
-				LargestCriticalStrike:          p.LargestCriticalStrike,
-				LargestKillingSpree:            p.LargestKillingSpree,
-				LargestMultiKill:               p.LargestMultiKill,
-				FirstTowerAssist:               p.FirstTowerAssist,
-				FirstTowerKill:                 p.FirstTowerKill,
-				InhibitorKills:                 p.InhibitorKills,
-				InhibitorTakedowns:             p.InhibitorTakedowns,
-				InhibitorsLost:                 p.InhibitorsLost,
-				ItemsPurchased:                 p.ItemsPurchased,
-				KillingSprees:                  p.KillingSprees,
-				NexusKills:                     p.NexusKills,
-				NexusTakedowns:                 p.NexusTakedowns,
-				NexusLost:                      p.NexusLost,
-				LongestTimeSpentLiving:         p.LongestTimeSpentLiving,
-				ObjectiveStolen:                p.ObjectiveStolen,
-				ObjectiveStolenAssists:         p.ObjectiveStolenAssists,
-				SightWardsBoughtInGame:         p.SightWardsBoughtInGame,
-				VisionWardsBoughtInGame:        p.VisionWardsBoughtInGame,
-				SummonerId:                     p.SummonerId,
-				TimeCCingOthers:                p.TimeCCingOthers,
-				TimePlayed:                     p.TimePlayed,
-				TotalDamageShieldedOnTeammates: p.TotalDamageShieldedOnTeammates,
-				TotalTimeSpentDead:             p.TotalTimeSpentDead,
-				TotalUnitsHealed:               p.TotalUnitsHealed,
-				TrueDamageDealt:                p.TrueDamageDealt,
-				TurretKills:                    p.TurretKills,
-				TurretTakedowns:                p.TurretTakedowns,
-				TurretsLost:                    p.TurretsLost,
-				UnrealKills:                    p.UnrealKills,
-				WardsKilled:                    p.WardsKilled,
-				WardsPlaced:                    p.WardsPlaced,
-			}
-			if err := matchParticipantDetailEntity.Insert(db); err != nil {
-				log.Error(err)
-				return err
-			}
-
-			// insert new match participant perk
-			matchParticipantPerkEntity := models.MatchParticipantPerkDAO{
-				MatchParticipantId: matchParticipantId,
-				StatPerkDefense:    p.Perks.StatPerks.Defense,
-				StatPerkFlex:       p.Perks.StatPerks.Flex,
-				StatPerkOffense:    p.Perks.StatPerks.Offense,
-			}
-			if err := matchParticipantPerkEntity.InsertTx(db); err != nil {
-				log.Error(err)
-				return err
-			}
-
-			// insert new match participant perk style
-			for _, style := range p.Perks.Styles {
-				styleId := uuid.New().String()
-				matchParticipantPerkStyleEntity := models.MatchParticipantPerkStyleDAO{
-					MatchParticipantId: matchParticipantId,
-					StyleId:            styleId,
-					Description:        style.Description,
-					Style:              style.Style,
-				}
-				if err := matchParticipantPerkStyleEntity.Insert(db); err != nil {
-					log.Error(err)
-					return err
-				}
-
-				// insert new match participant perk style selections
-				for _, selection := range style.Selections {
-					matchParticipantPerkStyleSelectionEntity := models.MatchParticipantPerkStyleSelectionDAO{
-						StyleId: styleId,
-						Perk:    selection.Perk,
-						Var1:    selection.Var1,
-						Var2:    selection.Var2,
-						Var3:    selection.Var3,
-					}
-					if err := matchParticipantPerkStyleSelectionEntity.Insert(db); err != nil {
-						log.Error(err)
-						return err
-					}
-				}
-			}
-		}
-
-		// insert new match team
-		for _, t := range match.Info.Teams {
-			matchTeamEntity := models.MatchTeamDAO{
-				MatchId:         matchId,
-				TeamId:          t.TeamId,
-				Win:             t.Win,
-				BaronFirst:      t.Objectives.Baron.First,
-				BaronKills:      t.Objectives.Baron.Kills,
-				ChampionFirst:   t.Objectives.Champion.First,
-				ChampionKills:   t.Objectives.Champion.Kills,
-				DragonFirst:     t.Objectives.Dragon.First,
-				DragonKills:     t.Objectives.Dragon.Kills,
-				InhibitorFirst:  t.Objectives.Inhibitor.First,
-				InhibitorKills:  t.Objectives.Inhibitor.Kills,
-				RiftHeraldFirst: t.Objectives.RiftHerald.First,
-				RiftHeraldKills: t.Objectives.RiftHerald.Kills,
-				TowerFirst:      t.Objectives.Tower.First,
-				TowerKills:      t.Objectives.Tower.Kills,
-			}
-			if err := matchTeamEntity.Insert(db); err != nil {
-				log.Error(err)
-				return err
-			}
-
-			// insert new match team bans
-			for _, ban := range t.Bans {
-				matchTeamBanEntity := models.MatchTeamBanDAO{
-					MatchId:    matchId,
-					TeamId:     t.TeamId,
-					ChampionId: ban.ChampionId,
-					PickTurn:   ban.PickTurn,
-				}
-				if err := matchTeamBanEntity.Insert(db); err != nil {
-					log.Error(err)
-					return err
-				}
-			}
+func fetchSummonerMatchesFromRiot(matchId string, resultChan chan<- riotSummonerMatchResult) {
+	match, err := api.GetMatchByMatchId(matchId)
+	if err != nil {
+		log.Error(err)
+		resultChan <- riotSummonerMatchResult{
+			match: nil,
+			err:   err,
 		}
 	} else {
-		// ok, match exists in local db
-		// check if match is connected -> summoner
-		_, exists, err = models.GetSummonerMatchDAO(db, puuid, matchId)
-		if err != nil {
-			log.Error(err)
-			return err
+		resultChan <- riotSummonerMatchResult{
+			match: match,
+			err:   nil,
 		}
-		if !exists {
+	}
+}
+
+func saveMatchToLocalDB(db db.Context, puuid string, match *api.MatchDto) error {
+	matchId := match.Metadata.MatchId
+	matchDAO := &models.MatchDAO{
+		MatchId:            matchId,
+		DataVersion:        match.Metadata.DataVersion,
+		GameCreation:       match.Info.GameCreation,
+		GameDuration:       match.Info.GameDuration,
+		GameEndTimestamp:   match.Info.GameEndTimestamp,
+		GameId:             match.Info.GameId,
+		GameMode:           match.Info.GameMode,
+		GameName:           match.Info.GameName,
+		GameStartTimestamp: match.Info.GameStartTimestamp,
+		GameType:           match.Info.GameType,
+		GameVersion:        match.Info.GameVersion,
+		MapId:              match.Info.MapId,
+		PlatformId:         match.Info.PlatformId,
+		QueueId:            match.Info.QueueId,
+		TournamentCode:     match.Info.TournamentCode,
+	}
+	if err := matchDAO.Insert(db); err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// insert new match participants
+	for _, p := range match.Info.Participants {
+		matchParticipantId := uuid.New().String()
+
+		if p.Puuid == puuid {
 			// insert new summoner match (upsert)
 			summonerMatchEntity := models.SummonerMatchDAO{
-				Puuid:   puuid,
+				Puuid:   p.Puuid,
 				MatchId: matchId,
 			}
 			if err := summonerMatchEntity.Upsert(db); err != nil {
@@ -472,8 +308,235 @@ func RenewSummonerMatchIfNecessary(db db.Context, puuid string, matchId string) 
 				return err
 			}
 		}
+
+		// insert new match participant
+		matchParticipantEntity := models.MatchParticipantDAO{
+			MatchId:                        matchId,
+			ParticipantId:                  p.ParticipantId,
+			MatchParticipantId:             matchParticipantId,
+			Puuid:                          p.Puuid,
+			Kills:                          p.Kills,
+			Deaths:                         p.Deaths,
+			Assists:                        p.Assists,
+			ChampionId:                     p.ChampionId,
+			ChampionLevel:                  p.ChampLevel,
+			ChampionName:                   p.ChampionName,
+			ChampExperience:                p.ChampExperience,
+			SummonerLevel:                  p.SummonerLevel,
+			SummonerName:                   p.SummonerName,
+			RiotIdName:                     p.RiotIdGameName,
+			RiotIdTagLine:                  p.RiotIdTagline,
+			ProfileIcon:                    p.ProfileIcon,
+			MagicDamageDealtToChampions:    p.MagicDamageDealtToChampions,
+			PhysicalDamageDealtToChampions: p.PhysicalDamageDealtToChampions,
+			TrueDamageDealtToChampions:     p.TrueDamageDealtToChampions,
+			TotalDamageDealtToChampions:    p.TotalDamageDealtToChampions,
+			MagicDamageTaken:               p.MagicDamageTaken,
+			PhysicalDamageTaken:            p.PhysicalDamageTaken,
+			TrueDamageTaken:                p.TrueDamageTaken,
+			TotalDamageTaken:               p.TotalDamageTaken,
+			TotalHeal:                      p.TotalHeal,
+			TotalHealsOnTeammates:          p.TotalHealsOnTeammates,
+			Item0:                          p.Item0,
+			Item1:                          p.Item1,
+			Item2:                          p.Item2,
+			Item3:                          p.Item3,
+			Item4:                          p.Item4,
+			Item5:                          p.Item5,
+			Item6:                          p.Item6,
+			Spell1Casts:                    p.Spell1Casts,
+			Spell2Casts:                    p.Spell2Casts,
+			Spell3Casts:                    p.Spell3Casts,
+			Spell4Casts:                    p.Spell4Casts,
+			Summoner1Casts:                 p.Summoner1Casts,
+			Summoner1Id:                    p.Summoner1Id,
+			Summoner2Casts:                 p.Summoner2Casts,
+			Summoner2Id:                    p.Summoner2Id,
+			FirstBloodAssist:               p.FirstBloodAssist,
+			FirstBloodKill:                 p.FirstBloodKill,
+			DoubleKills:                    p.DoubleKills,
+			TripleKills:                    p.TripleKills,
+			QuadraKills:                    p.QuadraKills,
+			PentaKills:                     p.PentaKills,
+			TotalMinionsKilled:             p.TotalMinionsKilled,
+			TotalTimeCCDealt:               p.TotalTimeCCDealt,
+			NeutralMinionsKilled:           p.NeutralMinionsKilled,
+			GoldSpent:                      p.GoldSpent,
+			GoldEarned:                     p.GoldEarned,
+			IndividualPosition:             p.IndividualPosition,
+			TeamPosition:                   p.TeamPosition,
+			Lane:                           p.Lane,
+			Role:                           p.Role,
+			TeamId:                         p.TeamId,
+			VisionScore:                    p.VisionScore,
+			Win:                            p.Win,
+			GameEndedInEarlySurrender:      p.GameEndedInEarlySurrender,
+			GameEndedInSurrender:           p.GameEndedInSurrender,
+			TeamEarlySurrendered:           p.TeamEarlySurrendered,
+		}
+		if err := matchParticipantEntity.Insert(db); err != nil {
+			log.Error(err)
+			return err
+		}
+
+		// insert new match participant detail
+		matchParticipantDetailEntity := models.MatchParticipantDetailDAO{
+			MatchParticipantId:             matchParticipantId,
+			MatchId:                        matchId,
+			BaronKills:                     p.BaronKills,
+			BountyLevel:                    p.BountyLevel,
+			ChampionTransform:              p.ChampionTransform,
+			ConsumablesPurchased:           p.ConsumablesPurchased,
+			DamageDealtToBuildings:         p.DamageDealtToBuildings,
+			DamageDealtToObjectives:        p.DamageDealtToObjectives,
+			DamageDealtToTurrets:           p.DamageDealtToTurrets,
+			DamageSelfMitigated:            p.DamageSelfMitigated,
+			DetectorWardsPlaced:            p.DetectorWardsPlaced,
+			DragonKills:                    p.DragonKills,
+			PhysicalDamageDealt:            p.PhysicalDamageDealt,
+			MagicDamageDealt:               p.MagicDamageDealt,
+			TotalDamageDealt:               p.TotalDamageDealt,
+			LargestCriticalStrike:          p.LargestCriticalStrike,
+			LargestKillingSpree:            p.LargestKillingSpree,
+			LargestMultiKill:               p.LargestMultiKill,
+			FirstTowerAssist:               p.FirstTowerAssist,
+			FirstTowerKill:                 p.FirstTowerKill,
+			InhibitorKills:                 p.InhibitorKills,
+			InhibitorTakedowns:             p.InhibitorTakedowns,
+			InhibitorsLost:                 p.InhibitorsLost,
+			ItemsPurchased:                 p.ItemsPurchased,
+			KillingSprees:                  p.KillingSprees,
+			NexusKills:                     p.NexusKills,
+			NexusTakedowns:                 p.NexusTakedowns,
+			NexusLost:                      p.NexusLost,
+			LongestTimeSpentLiving:         p.LongestTimeSpentLiving,
+			ObjectiveStolen:                p.ObjectiveStolen,
+			ObjectiveStolenAssists:         p.ObjectiveStolenAssists,
+			SightWardsBoughtInGame:         p.SightWardsBoughtInGame,
+			VisionWardsBoughtInGame:        p.VisionWardsBoughtInGame,
+			SummonerId:                     p.SummonerId,
+			TimeCCingOthers:                p.TimeCCingOthers,
+			TimePlayed:                     p.TimePlayed,
+			TotalDamageShieldedOnTeammates: p.TotalDamageShieldedOnTeammates,
+			TotalTimeSpentDead:             p.TotalTimeSpentDead,
+			TotalUnitsHealed:               p.TotalUnitsHealed,
+			TrueDamageDealt:                p.TrueDamageDealt,
+			TurretKills:                    p.TurretKills,
+			TurretTakedowns:                p.TurretTakedowns,
+			TurretsLost:                    p.TurretsLost,
+			UnrealKills:                    p.UnrealKills,
+			WardsKilled:                    p.WardsKilled,
+			WardsPlaced:                    p.WardsPlaced,
+		}
+		if err := matchParticipantDetailEntity.Insert(db); err != nil {
+			log.Error(err)
+			return err
+		}
+
+		// insert new match participant perk
+		matchParticipantPerkEntity := models.MatchParticipantPerkDAO{
+			MatchParticipantId: matchParticipantId,
+			StatPerkDefense:    p.Perks.StatPerks.Defense,
+			StatPerkFlex:       p.Perks.StatPerks.Flex,
+			StatPerkOffense:    p.Perks.StatPerks.Offense,
+		}
+		if err := matchParticipantPerkEntity.InsertTx(db); err != nil {
+			log.Error(err)
+			return err
+		}
+
+		// insert new match participant perk style
+		for _, style := range p.Perks.Styles {
+			styleId := uuid.New().String()
+			matchParticipantPerkStyleEntity := models.MatchParticipantPerkStyleDAO{
+				MatchParticipantId: matchParticipantId,
+				StyleId:            styleId,
+				Description:        style.Description,
+				Style:              style.Style,
+			}
+			if err := matchParticipantPerkStyleEntity.Insert(db); err != nil {
+				log.Error(err)
+				return err
+			}
+
+			// insert new match participant perk style selections
+			for _, selection := range style.Selections {
+				matchParticipantPerkStyleSelectionEntity := models.MatchParticipantPerkStyleSelectionDAO{
+					StyleId: styleId,
+					Perk:    selection.Perk,
+					Var1:    selection.Var1,
+					Var2:    selection.Var2,
+					Var3:    selection.Var3,
+				}
+				if err := matchParticipantPerkStyleSelectionEntity.Insert(db); err != nil {
+					log.Error(err)
+					return err
+				}
+			}
+		}
 	}
 
+	// insert new match team
+	for _, t := range match.Info.Teams {
+		matchTeamEntity := models.MatchTeamDAO{
+			MatchId:         matchId,
+			TeamId:          t.TeamId,
+			Win:             t.Win,
+			BaronFirst:      t.Objectives.Baron.First,
+			BaronKills:      t.Objectives.Baron.Kills,
+			ChampionFirst:   t.Objectives.Champion.First,
+			ChampionKills:   t.Objectives.Champion.Kills,
+			DragonFirst:     t.Objectives.Dragon.First,
+			DragonKills:     t.Objectives.Dragon.Kills,
+			InhibitorFirst:  t.Objectives.Inhibitor.First,
+			InhibitorKills:  t.Objectives.Inhibitor.Kills,
+			RiftHeraldFirst: t.Objectives.RiftHerald.First,
+			RiftHeraldKills: t.Objectives.RiftHerald.Kills,
+			TowerFirst:      t.Objectives.Tower.First,
+			TowerKills:      t.Objectives.Tower.Kills,
+		}
+		if err := matchTeamEntity.Insert(db); err != nil {
+			log.Error(err)
+			return err
+		}
+
+		// insert new match team bans
+		for _, ban := range t.Bans {
+			matchTeamBanEntity := models.MatchTeamBanDAO{
+				MatchId:    matchId,
+				TeamId:     t.TeamId,
+				ChampionId: ban.ChampionId,
+				PickTurn:   ban.PickTurn,
+			}
+			if err := matchTeamBanEntity.Insert(db); err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func renewMatchInLocalDB(db db.Context, puuid string, matchId string) error {
+	// ok, match exists in local db
+	// check if match is connected -> summoner
+	_, exists, err := models.GetSummonerMatchDAO(db, puuid, matchId)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	if !exists {
+		// insert new summoner match (upsert)
+		summonerMatchEntity := models.SummonerMatchDAO{
+			Puuid:   puuid,
+			MatchId: matchId,
+		}
+		if err := summonerMatchEntity.Upsert(db); err != nil {
+			log.Error(err)
+			return err
+		}
+	}
 	return nil
 }
 
