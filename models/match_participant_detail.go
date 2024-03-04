@@ -15,10 +15,10 @@ type MatchParticipantDetailDAO struct {
 	ChampionTransform    int `db:"champion_transform" json:"championTransform"`
 	ConsumablesPurchased int `db:"consumables_purchased" json:"consumablesPurchased"`
 
-	DamageDealtToBuildings  int `db:"damage_dealt_to_buildings" json:"damageDealtToBuildings"`
-	DamageDealtToObjectives int `db:"damage_dealt_to_objectives" json:"damageDealtToObjectives"`
-	DamageDealtToTurrets    int `db:"damage_dealt_to_turrets" json:"damageDealtToTurrets"`
-	DamageSelfMitigated     int `db:"damage_self_mitigated" json:"damageSelfMitigated"`
+	DamageDealtToBuildings  int `db:"damage_dealt_to_buildings" json:"damageDealtToBuildings"`   // 건물에 입힌 피해량
+	DamageDealtToObjectives int `db:"damage_dealt_to_objectives" json:"damageDealtToObjectives"` // 목표물에 입힌 피해량
+	DamageDealtToTurrets    int `db:"damage_dealt_to_turrets" json:"damageDealtToTurrets"`       // 포탑에 입힌 피해량
+	DamageSelfMitigated     int `db:"damage_self_mitigated" json:"damageSelfMitigated"`          // 자신에 대한 피해 감소량
 
 	DetectorWardsPlaced int `db:"detector_wards_placed" json:"detectorWardsPlaced"`
 	DragonKills         int `db:"dragon_kills" json:"dragonKills"`
@@ -103,4 +103,16 @@ func (m *MatchParticipantDetailDAO) Insert(db db.Context) error {
 		return err
 	}
 	return nil
+}
+
+func GetMatchParticipantDetailDAOs_byMatchId(db db.Context, matchId string) ([]MatchParticipantDetailDAO, error) {
+	var details []MatchParticipantDetailDAO
+	if err := db.Select(&details, `
+		SELECT *
+		FROM match_participant_details
+		WHERE match_id = ?`, matchId,
+	); err != nil {
+		return nil, err
+	}
+	return details, nil
 }

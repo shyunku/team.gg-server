@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.3.3"
+const VERSION = "0.4.0"
 
 func main() {
 	fmt.Println(`

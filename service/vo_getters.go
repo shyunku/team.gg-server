@@ -96,25 +96,25 @@ func getSummonerMatchSummaryVOs(puuid string, matchSummaryMXDAOs []*SummonerMatc
 			return nil, err
 		}
 
+		matchParticipantDetailMap := make(map[string]models.MatchParticipantDetailDAO)
+		matchParticipantDetailDAOs, err := models.GetMatchParticipantDetailDAOs_byMatchId(db.Root, summonerRecentMatchSummaryMXDAO.MatchId)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		for _, matchParticipantDetailDAO := range matchParticipantDetailDAOs {
+			matchParticipantDetailMap[matchParticipantDetailDAO.MatchParticipantId] = matchParticipantDetailDAO
+		}
+
 		var myStat *SummonerMatchParticipantVO
 
 		team1Participants := make([]TeammateVO, 0)
 		team2Participants := make([]TeammateVO, 0)
 		for _, matchParticipant := range matchParticipants {
-			teamMate := SummonerMatchSummaryTeamMateMixer(matchParticipant)
-			if matchParticipant.TeamId == 100 {
-				team1Participants = append(team1Participants, teamMate)
-			} else {
-				team2Participants = append(team2Participants, teamMate)
-			}
-		}
-
-		for _, matchParticipant := range matchParticipants {
 			perks, err := models.GetMatchParticipantPerkStyleDAOs(db.Root, matchParticipant.MatchParticipantId)
 			if err != nil {
 				log.Warn(err)
 			}
-
 			primaryPerkStyle := 0
 			subPerkStyle := 0
 			for _, perk := range perks {
@@ -123,6 +123,18 @@ func getSummonerMatchSummaryVOs(puuid string, matchSummaryMXDAOs []*SummonerMatc
 				} else if perk.Description == PerkStyleDescriptionTypeSub {
 					subPerkStyle = perk.Style
 				}
+			}
+
+			detail, ok := matchParticipantDetailMap[matchParticipant.MatchParticipantId]
+			if !ok {
+				return nil, fmt.Errorf("matchParticipantDetailMap does not have key (%s)", matchParticipant.MatchParticipantId)
+			}
+
+			teamMate := SummonerMatchSummaryTeamMateMixer(matchParticipant, detail, primaryPerkStyle, subPerkStyle)
+			if matchParticipant.TeamId == 100 {
+				team1Participants = append(team1Participants, teamMate)
+			} else {
+				team2Participants = append(team2Participants, teamMate)
 			}
 
 			if matchParticipant.Puuid == puuid {

@@ -88,16 +88,86 @@ type SummonerMatchParticipantVO struct {
 }
 
 type TeammateVO struct {
-	ChampionId            int    `json:"championId"`
+	ChampionId    int `json:"championId"`
+	ChampionLevel int `json:"championLevel"`
+
 	SummonerName          string `json:"summonerName"`
+	SummonerLevel         int    `json:"summonerLevel"`
 	RiotIdName            string `json:"riotIdName"`
 	RiotIdTagLine         string `json:"riotIdTagLine"`
 	Puuid                 string `json:"puuid"`
 	TotalDealtToChampions int    `json:"totalDealtToChampions"`
-	Kills                 int    `json:"kills"`
-	IndividualPosition    string `json:"individualPosition"`
-	TeamPosition          string `json:"teamPosition"`
-	ProfileIcon           int    `json:"profileIcon"`
+
+	Kills   int `json:"kills"`
+	Deaths  int `json:"deaths"`
+	Assists int `json:"assists"`
+
+	MagicDamageDealtToChampions    int `json:"magicDamageDealtToChampions"`
+	PhysicalDamageDealtToChampions int `json:"physicalDamageDealtToChampions"`
+	TrueDamageDealtToChampions     int `json:"trueDamageDealtToChampions"`
+	TotalDamageDealtToChampions    int `json:"totalDamageDealtToChampions"`
+
+	MagicDamageTaken    int `json:"magicDamageTaken"`
+	PhysicalDamageTaken int `json:"physicalDamageTaken"`
+	TrueDamageTaken     int `json:"trueDamageTaken"`
+	TotalDamageTaken    int `json:"totalDamageTaken"`
+
+	TotalHeal             int `json:"totalHeal"`
+	TotalHealsOnTeammates int `json:"totalHealsOnTeammates"`
+
+	Item0 int `json:"item0"`
+	Item1 int `json:"item1"`
+	Item2 int `json:"item2"`
+	Item3 int `json:"item3"`
+	Item4 int `json:"item4"`
+	Item5 int `json:"item5"`
+	Item6 int `json:"item6"`
+
+	Spell1Casts int `json:"spell1Casts"`
+	Spell2Casts int `json:"spell2Casts"`
+	Spell3Casts int `json:"spell3Casts"`
+	Spell4Casts int `json:"spell4Casts"`
+
+	Summoner1Casts int `json:"summoner1Casts"`
+	Summoner1Id    int `json:"summoner1Id"`
+	Summoner2Casts int `json:"summoner2Casts"`
+	Summoner2Id    int `json:"summoner2Id"`
+
+	PrimaryPerkStyle int `json:"primaryPerkStyle"`
+	SubPerkStyle     int `json:"subPerkStyle"`
+
+	FirstBloodAssist bool `json:"firstBloodAssist"`
+	FirstBloodKill   bool `json:"firstBloodKill"`
+
+	DoubleKills int `json:"doubleKills"`
+	TripleKills int `json:"tripleKills"`
+	QuadraKills int `json:"quadraKills"`
+	PentaKills  int `json:"pentaKills"`
+
+	TotalMinionsKilled   int `json:"totalMinionsKilled"`
+	TotalTimeCCDealt     int `json:"totalTimeCCDealt"`
+	NeutralMinionsKilled int `json:"neutralMinionsKilled"`
+
+	GoldSpent  int `json:"goldSpent"`
+	GoldEarned int `json:"goldEarned"`
+
+	VisionScore             int `json:"visionScore"`
+	DetectorWardsPlaced     int `json:"detectorWardsPlaced"`     // 제어와드 설치?
+	SightWardsBoughtInGame  int `json:"sightWardsBoughtInGame"`  // 시야석 구매
+	VisionWardsBoughtInGame int `json:"visionWardsBoughtInGame"` // 제어와드 구매
+	WardsKilled             int `json:"wardsKilled"`
+	WardsPlaced             int `json:"wardsPlaced"`
+
+	DamageDealtToBuildings  int `json:"damageDealtToBuildings"`
+	DamageDealtToObjectives int `json:"damageDealtToObjectives"`
+	DamageDealtToTurrets    int `json:"damageDealtToTurrets"`
+	DamageSelfMitigated     int `json:"damageSelfMitigated"`
+
+	IndividualPosition string `json:"individualPosition"`
+	TeamPosition       string `json:"teamPosition"`
+	Lane               string `json:"lane"`
+	Role               string `json:"role"`
+	ProfileIcon        int    `json:"profileIcon"`
 }
 
 type MatchSummaryVO struct {
@@ -109,6 +179,9 @@ type MatchSummaryVO struct {
 	MyStat             SummonerMatchParticipantVO `json:"myStat"`
 	Team1              []TeammateVO               `json:"team1"`
 	Team2              []TeammateVO               `json:"team2"`
+}
+
+type MatchDetailVO struct {
 }
 
 type IngameParticipantVO struct {
