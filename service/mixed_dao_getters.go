@@ -6,71 +6,44 @@ import (
 	"team.gg-server/libs/db"
 )
 
-func GetSummonerRecentMatchSummaryMXDAOs(puuid string, count int) ([]*SummonerMatchSummaryMXDAO, error) {
-	var summaries []*SummonerMatchSummaryMXDAO
-	if err := db.Root.Select(&summaries, `
-		SELECT m.*, mp.*
-		FROM summoner_matches sm
-		LEFT JOIN matches m ON sm.match_id = m.match_id
-		LEFT JOIN match_participants mp ON mp.match_id = m.match_id AND mp.puuid = sm.puuid
-		WHERE sm.puuid = ? AND mp.match_id IS NOT NULL
-		ORDER BY m.game_end_timestamp DESC
-		LIMIT ?`, puuid, count,
-	); err != nil {
+func GetSummonerSoloRankingMXDAO(puuid string) (*SummonerRankingMXDAO, error) {
+	var rankingMXDAO SummonerRankingMXDAO
+	if err := db.Root.Get(&rankingMXDAO, `
+		WITH rank_data AS (
+			SELECT
+				s.puuid,
+				s.game_name,
+				s.tag_line,
+				l.tier,
+				l.league_rank,
+				IF(ISNULL(l.league_rank), 0, l.league_points) as league_points,
+				IF(ISNULL(l.league_rank), 0, (str.score + l.league_points)) as rating_points,
+				ROW_NUMBER() OVER (ORDER BY IF(ISNULL(l.league_rank), 0, (str.score + l.league_points)) DESC) as ranking
+			FROM
+				summoners s
+			LEFT JOIN
+				leagues l ON s.puuid = l.puuid AND l.queue_type = ?
+			LEFT JOIN
+				static_tier_ranks str ON l.tier = str.tier_label AND l.league_rank = str.rank_label
+		), total_rankers AS (
+			SELECT COUNT(*) as total FROM rank_data
+		)
+		SELECT rank_data.*, total_rankers.total
+		FROM rank_data, total_rankers
+		WHERE rank_data.puuid = ?;
+	`, RankTypeSolo, puuid); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*SummonerMatchSummaryMXDAO, 0), nil
+			return nil, nil
 		}
 		return nil, err
 	}
-	return summaries, nil
-}
 
-func GetSummonerRecentMatchSummaryMXDAOs_byQueueId(puuid string, queueId, count int) ([]*SummonerMatchSummaryMXDAO, error) {
-	if queueId == 0 {
-		return GetSummonerRecentMatchSummaryMXDAOs(puuid, count)
-	}
-
-	var summaries []*SummonerMatchSummaryMXDAO
-	if err := db.Root.Select(&summaries, `
-		SELECT m.*, mp.*
-		FROM summoner_matches sm
-		LEFT JOIN matches m ON sm.match_id = m.match_id
-		LEFT JOIN match_participants mp ON mp.match_id = m.match_id AND mp.puuid = sm.puuid
-		WHERE sm.puuid = ? AND mp.match_id IS NOT NULL AND m.queue_id = ?
-		ORDER BY m.game_end_timestamp DESC
-		LIMIT ?`, puuid, queueId, count,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*SummonerMatchSummaryMXDAO, 0), nil
-		}
-		return nil, err
-	}
-	return summaries, nil
-}
-
-func GetSummonerMatchSummaryMXDAOS_before(puuid string, before int64, count int) ([]*SummonerMatchSummaryMXDAO, error) {
-	var summaries []*SummonerMatchSummaryMXDAO
-	if err := db.Root.Select(&summaries, `
-		SELECT m.*, mp.*
-		FROM summoner_matches sm
-		LEFT JOIN matches m ON sm.match_id = m.match_id
-		LEFT JOIN match_participants mp ON mp.match_id = m.match_id AND mp.puuid = sm.puuid
-		WHERE sm.puuid = ?
-		AND m.game_end_timestamp < ?
-		ORDER BY m.game_end_timestamp DESC
-		LIMIT ?`, puuid, before, count,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*SummonerMatchSummaryMXDAO, 0), nil
-		}
-		return nil, err
-	}
-	return summaries, nil
+	return &rankingMXDAO, nil
 }
 
 func GetChampionStatisticMXDAOs() ([]*ChampionStatisticMXDAO, error) {
 	var statistics []*ChampionStatisticMXDAO
-	if err := db.Root.Select(&statistics, `
+	if err := StatisticsDB.Select(&statistics, `
 		WITH ChampionStats AS (
 			SELECT
 				mp.champion_id AS champion_id,
@@ -115,7 +88,7 @@ func GetChampionStatisticMXDAOs() ([]*ChampionStatisticMXDAO, error) {
 
 func GetTierStatisticsTierCountMXDAOs() ([]*TierStatisticsTierCountMXDAO, error) {
 	var tierCounts []*TierStatisticsTierCountMXDAO
-	if err := db.Root.Select(&tierCounts, `
+	if err := StatisticsDB.Select(&tierCounts, `
 		SELECT l.queue_type, l.tier, l.league_rank, COUNT(*) AS count
 		FROM leagues l
 		LEFT JOIN summoners s ON l.puuid = s.puuid
@@ -132,7 +105,7 @@ func GetTierStatisticsTierCountMXDAOs() ([]*TierStatisticsTierCountMXDAO, error)
 
 func GetTierStatisticsTopRankersMXDAOs(topRanks int) ([]*TierStatisticsTopRankersMXDAO, error) {
 	var topRankers []*TierStatisticsTopRankersMXDAO
-	if err := db.Root.Select(&topRankers, `
+	if err := StatisticsDB.Select(&topRankers, `
 		WITH RankedLeagues AS (
 			SELECT
 				l.queue_type,
@@ -176,7 +149,7 @@ func GetTierStatisticsTopRankersMXDAOs(topRanks int) ([]*TierStatisticsTopRanker
 
 func GetMasteryStatisticsMXDAOs() ([]*MasteryStatisticsMXDAO, error) {
 	var statistics []*MasteryStatisticsMXDAO
-	if err := db.Root.Select(&statistics, `
+	if err := StatisticsDB.Select(&statistics, `
 		SELECT
 			m.champion_id,
 			MAX(m.champion_points) as max_mastery,
@@ -197,7 +170,7 @@ func GetMasteryStatisticsMXDAOs() ([]*MasteryStatisticsMXDAO, error) {
 
 func GetMasteryStatisticsTopRankersMXDAOs(topRanks int) ([]*MasteryStatisticsTopRankersMXDAO, error) {
 	var topRankers []*MasteryStatisticsTopRankersMXDAO
-	if err := db.Root.Select(&topRankers, `
+	if err := StatisticsDB.Select(&topRankers, `
 		WITH RankedMasteries AS (
 			SELECT
 			    puuid,

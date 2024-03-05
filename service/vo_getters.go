@@ -5,6 +5,7 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
+	"team.gg-server/models/mixed"
 )
 
 // vo_getters configure vo with VAO and mixed-VAO (null-safe)
@@ -34,6 +35,43 @@ func GetSummonerSummaryVO_byPuuid(puuid string) (*SummonerSummaryVO, error) {
 		return nil, fmt.Errorf("summoner dao not found with puuid (%s)", puuid)
 	}
 	summonerVo := SummonerSummaryMixer(*summonerDao)
+	return &summonerVo, nil
+}
+
+func GetSummonerExtraVO(puuid string) (*SummonerExtraVO, error) {
+	rankingVO, err := getSummonerRankingVO(puuid)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	matchParticipantExtraMXDAOs, err := mixed.GetMatchParticipantExtraMXDAOs_byQueueId(puuid, QueueTypeAll, 30)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	ggScoreSum := 0.0
+	for _, extraMXDAO := range matchParticipantExtraMXDAOs {
+		ggScoreSum += extraMXDAO.GetScore()
+	}
+	ggScoreAvg := ggScoreSum / float64(len(matchParticipantExtraMXDAOs))
+
+	// TODO :: add some extra fun things (statistics: tags)
+
+	return &SummonerExtraVO{
+		Ranking:          *rankingVO,
+		RecentAvgGGScore: ggScoreAvg,
+	}, nil
+}
+
+func getSummonerRankingVO(puuid string) (*SummonerRankingVO, error) {
+	summonerRankingMXDAO, err := GetSummonerSoloRankingMXDAO(puuid)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	summonerVo := SummonerRankingMixer(*summonerRankingMXDAO)
 	return &summonerVo, nil
 }
 
@@ -69,49 +107,52 @@ func GetSummonerMasteryVOs(puuid string) ([]SummonerMasteryVO, error) {
 	return masteryVos, nil
 }
 
-func GetSummonerRecentMatchSummaryVOs(puuid string, queueId, count int) ([]MatchSummaryVO, error) {
-	matchSummaryMXDAOs, err := GetSummonerRecentMatchSummaryMXDAOs_byQueueId(puuid, queueId, count)
+// GetSummonerRecentMatchSummaryVOs_byQueueId 특정 플레이어의 최근 특정 큐 (ex. 솔랭, 자랭) 의 최근 매치 요약 정보를 가져옵니다.
+func GetSummonerRecentMatchSummaryVOs_byQueueId(puuid string, queueId, count int) ([]MatchSummaryVO, error) {
+	var matchDAOs []*models.MatchDAO
+	var err error
+	if queueId == QueueTypeAll {
+		matchDAOs, err = models.GetMatchDAOs_byPuuid(db.Root, puuid, count)
+	} else {
+		matchDAOs, err = models.GetMatchDAOs_byQueueId(db.Root, puuid, queueId, count)
+	}
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	return getSummonerMatchSummaryVOs(puuid, matchSummaryMXDAOs)
+	return getSummonerMatchSummaryVOs(puuid, matchDAOs)
 }
 
-func GetSummonerMatchSummaryVOs_before(puuid string, before int64, count int) ([]MatchSummaryVO, error) {
-	matchSummaryMXDAOs, err := GetSummonerMatchSummaryMXDAOS_before(puuid, before, count)
+// GetSummonerMatchSummaryVOs_byQueueId_before 특정 시간 이전의 매치 요약 정보를 가져옵니다.
+func GetSummonerMatchSummaryVOs_byQueueId_before(puuid string, queueId int, before int64, count int) ([]MatchSummaryVO, error) {
+	var matchDAOs []*models.MatchDAO
+	var err error
+	if queueId == QueueTypeAll {
+		matchDAOs, err = models.GetMatchDAOs_byPuuid_before(db.Root, puuid, before, count)
+	} else {
+		matchDAOs, err = models.GetMatchDAOs_byQueueId_before(db.Root, puuid, queueId, before, count)
+	}
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	return getSummonerMatchSummaryVOs(puuid, matchSummaryMXDAOs)
+	return getSummonerMatchSummaryVOs(puuid, matchDAOs)
 }
 
-func getSummonerMatchSummaryVOs(puuid string, matchSummaryMXDAOs []*SummonerMatchSummaryMXDAO) ([]MatchSummaryVO, error) {
+func getSummonerMatchSummaryVOs(puuid string, matchDAOs []*models.MatchDAO) ([]MatchSummaryVO, error) {
 	matchSummaryVOs := make([]MatchSummaryVO, 0)
-	for _, summonerRecentMatchSummaryMXDAO := range matchSummaryMXDAOs {
-		matchParticipants, err := models.GetMatchParticipantDAOs(db.Root, summonerRecentMatchSummaryMXDAO.MatchId)
+	for _, matchDAO := range matchDAOs {
+		matchExtraMXDAOs, err := mixed.GetMatchParticipantExtraMXDAOs_byMatchId(matchDAO.MatchId)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
 
-		matchParticipantDetailMap := make(map[string]models.MatchParticipantDetailDAO)
-		matchParticipantDetailDAOs, err := models.GetMatchParticipantDetailDAOs_byMatchId(db.Root, summonerRecentMatchSummaryMXDAO.MatchId)
-		if err != nil {
-			log.Error(err)
-			return nil, err
-		}
-		for _, matchParticipantDetailDAO := range matchParticipantDetailDAOs {
-			matchParticipantDetailMap[matchParticipantDetailDAO.MatchParticipantId] = matchParticipantDetailDAO
-		}
-
-		var myStat *SummonerMatchParticipantVO
-
+		var myStat *TeammateVO
 		team1Participants := make([]TeammateVO, 0)
 		team2Participants := make([]TeammateVO, 0)
-		for _, matchParticipant := range matchParticipants {
-			perks, err := models.GetMatchParticipantPerkStyleDAOs(db.Root, matchParticipant.MatchParticipantId)
+		for _, matchExtraDAO := range matchExtraMXDAOs {
+			perks, err := models.GetMatchParticipantPerkStyleDAOs(db.Root, matchExtraDAO.MatchParticipantId)
 			if err != nil {
 				log.Warn(err)
 			}
@@ -125,21 +166,15 @@ func getSummonerMatchSummaryVOs(puuid string, matchSummaryMXDAOs []*SummonerMatc
 				}
 			}
 
-			detail, ok := matchParticipantDetailMap[matchParticipant.MatchParticipantId]
-			if !ok {
-				return nil, fmt.Errorf("matchParticipantDetailMap does not have key (%s)", matchParticipant.MatchParticipantId)
-			}
-
-			teamMate := SummonerMatchSummaryTeamMateMixer(matchParticipant, detail, primaryPerkStyle, subPerkStyle)
-			if matchParticipant.TeamId == 100 {
+			teamMate := SummonerMatchSummaryTeamMateMixer(*matchExtraDAO, primaryPerkStyle, subPerkStyle)
+			if matchExtraDAO.TeamId == 100 {
 				team1Participants = append(team1Participants, teamMate)
 			} else {
 				team2Participants = append(team2Participants, teamMate)
 			}
 
-			if matchParticipant.Puuid == puuid {
-				me := SummonerMatchSummaryParticipantMixer(*summonerRecentMatchSummaryMXDAO, primaryPerkStyle, subPerkStyle)
-				myStat = &me
+			if matchExtraDAO.Puuid == puuid {
+				myStat = &teamMate
 			}
 		}
 
@@ -148,7 +183,7 @@ func getSummonerMatchSummaryVOs(puuid string, matchSummaryMXDAOs []*SummonerMatc
 		}
 
 		matchSummaryVOs = append(matchSummaryVOs, SummonerMatchSummaryMixer(
-			*summonerRecentMatchSummaryMXDAO,
+			*matchDAO,
 			*myStat,
 			team1Participants,
 			team2Participants,

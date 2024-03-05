@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.4.0"
+const VERSION = "0.4.1"
 
 func main() {
 	fmt.Println(`
@@ -80,11 +80,16 @@ func main() {
 		log.Info("Running in production mode...")
 	}
 
-	// Init database
+	// Init Root database
+	var err error
 	log.Info("Initializing database...")
-	if _, err := db.Initialize(); err != nil {
+	if db.Root, err = db.Initiate(service.RootDatabaseInitializer); err != nil {
 		log.Error(err)
 		os.Exit(-4)
+	}
+	if service.StatisticsDB, err = db.Initiate(nil); err != nil {
+		log.Error(err)
+		os.Exit(-5)
 	}
 
 	// Init in-memory database

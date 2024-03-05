@@ -83,3 +83,79 @@ func GetOldestSummonerMatchDAO(db db.Context, puuid string) (*MatchDAO, bool, er
 	}
 	return &matchEntity, true, nil
 }
+
+func GetMatchDAOs_byPuuid(db db.Context, puuid string, count int) ([]*MatchDAO, error) {
+	var matches []*MatchDAO
+	if err := db.Select(&matches, `
+		SELECT m.*
+		FROM summoner_matches sm
+		LEFT JOIN matches m ON sm.match_id = m.match_id
+		WHERE sm.puuid = ?
+		ORDER BY m.game_end_timestamp DESC
+		LIMIT ?;
+	`, puuid, count); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*MatchDAO, 0), nil
+		}
+		return nil, err
+	}
+	return matches, nil
+}
+
+func GetMatchDAOs_byPuuid_before(db db.Context, puuid string, before int64, count int) ([]*MatchDAO, error) {
+	var matches []*MatchDAO
+	if err := db.Select(&matches, `
+		SELECT m.*
+		FROM summoner_matches sm
+		LEFT JOIN matches m ON sm.match_id = m.match_id
+		WHERE sm.puuid = ?
+		AND m.game_end_timestamp < ?
+		ORDER BY m.game_end_timestamp DESC
+		LIMIT ?;
+	`, puuid, before, count); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*MatchDAO, 0), nil
+		}
+		return nil, err
+	}
+	return matches, nil
+}
+
+func GetMatchDAOs_byQueueId(db db.Context, puuid string, queueId, count int) ([]*MatchDAO, error) {
+	var matches []*MatchDAO
+	if err := db.Select(&matches, `
+		SELECT m.*
+		FROM summoner_matches sm
+		LEFT JOIN matches m ON sm.match_id = m.match_id
+		WHERE sm.puuid = ?
+		AND m.queue_id = ?
+		ORDER BY m.game_end_timestamp DESC
+		LIMIT ?;
+	`, puuid, queueId, count); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*MatchDAO, 0), nil
+		}
+		return nil, err
+	}
+	return matches, nil
+}
+
+func GetMatchDAOs_byQueueId_before(db db.Context, puuid string, queueId int, before int64, count int) ([]*MatchDAO, error) {
+	var matches []*MatchDAO
+	if err := db.Select(&matches, `
+		SELECT m.*
+		FROM summoner_matches sm
+		LEFT JOIN matches m ON sm.match_id = m.match_id
+		WHERE sm.puuid = ?
+		AND m.queue_id = ?
+		AND m.game_end_timestamp < ?
+		ORDER BY m.game_end_timestamp DESC
+		LIMIT ?;
+	`, puuid, queueId, before, count); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*MatchDAO, 0), nil
+		}
+		return nil, err
+	}
+	return matches, nil
+}

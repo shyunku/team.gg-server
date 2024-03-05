@@ -1,15 +1,19 @@
 package service
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/hashicorp/go-version"
+	"github.com/jmoiron/sqlx"
 	"github.com/schollz/progressbar/v3"
 	log "github.com/shyunku-libraries/go-logger"
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"team.gg-server/core"
 	"team.gg-server/libs/http"
 	"team.gg-server/util"
@@ -25,6 +29,123 @@ var (
 	SummonerSpells = make(map[string]SummonerSpellDataVO) // key: summoner spell key
 	Perks          = make(map[int]PerkInfoVO)             // key: perk id
 	PerkStyles     = make(map[int]PerkStyleInfoVO)        // key: perk style id
+
+	RootDatabaseInitializer = func(db *sqlx.DB) error {
+		// find static data tables
+		var (
+			staticTierRankTable interface{}
+		)
+
+		if err := db.Get(&staticTierRankTable, "SELECT 1 FROM information_schema.tables WHERE table_name = 'static_tier_ranks' LIMIT 1"); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// create static tier ranks table
+				if _, err := db.Exec(`
+					CREATE TABLE static_tier_ranks (
+					    id INT AUTO_INCREMENT PRIMARY KEY,
+						tier_label VARCHAR(20) NOT NULL,
+						rank_label VARCHAR(20) NOT NULL,
+						score INT NOT NULL,
+						UNIQUE KEY (tier_label, rank_label),
+						UNIQUE KEY (score)
+					)
+				`); err != nil {
+					log.Error(err)
+					return err
+				}
+			} else {
+				log.Error(err)
+				return err
+			}
+		}
+
+		tx, err := db.BeginTxx(context.Background(), nil)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		tierKeys := make([]Tier, 0)
+		for tier, _ := range TierRankMap {
+			if tier == TierUnranked {
+				continue
+			}
+			tierKeys = append(tierKeys, tier)
+		}
+
+		sort.SliceStable(tierKeys, func(i, j int) bool {
+			tierLevelI, err := GetTierLevel(tierKeys[i])
+			if err != nil {
+				log.Fatal(err)
+				_ = tx.Rollback()
+				os.Exit(-2)
+			}
+			tierLevelJ, err := GetTierLevel(tierKeys[j])
+			if err != nil {
+				log.Fatal(err)
+				_ = tx.Rollback()
+				os.Exit(-3)
+			}
+			return tierLevelI < tierLevelJ
+		})
+		for _, tier := range tierKeys {
+			ranks := TierRankMap[tier]
+
+			sort.SliceStable(ranks, func(i, j int) bool {
+				rankLevelI, err := GetRankLevel(tier, ranks[i])
+				if err != nil {
+					log.Fatal(err)
+					_ = tx.Rollback()
+					os.Exit(-4)
+				}
+				rankLevelJ, err := GetRankLevel(tier, ranks[j])
+				if err != nil {
+					log.Fatal(err)
+					_ = tx.Rollback()
+					os.Exit(-5)
+				}
+				return rankLevelI < rankLevelJ
+			})
+			for _, rank := range ranks {
+				ratingPoint, err := CalculateRatingPoint(string(tier), string(rank), 0)
+				if err != nil {
+					log.Error(err)
+					_ = tx.Rollback()
+					return err
+				}
+
+				// get current score
+				needUpdate := false
+				var currentScore int
+				if err := tx.Get(&currentScore, "SELECT score FROM static_tier_ranks WHERE tier_label = ? AND rank_label = ?", tier, rank); err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						needUpdate = true
+						currentScore = -1
+					} else {
+						log.Error(err)
+						_ = tx.Rollback()
+						return err
+					}
+				}
+
+				if needUpdate {
+					// upsert
+					if _, err := tx.Exec(`
+						INSERT INTO static_tier_ranks (tier_label, rank_label, score) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE score = ?
+					`, tier, rank, ratingPoint, ratingPoint); err != nil {
+						log.Error(err)
+						_ = tx.Rollback()
+						return err
+					}
+				}
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+
+		return nil
+	}
 )
 
 func Preload() error {

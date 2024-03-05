@@ -11,6 +11,21 @@ import (
 
 var Root *sqlx.DB = nil
 
+type DatabaseInitializer func(db *sqlx.DB) error
+
+func getEndpoint() string {
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	databaseName := os.Getenv("DB_NAME")
+
+	databaseConfig := NewDatabaseConfig(user, password, host, port, databaseName)
+	endpoint := databaseConfig.getEndpointString()
+
+	return endpoint
+}
+
 type DatabaseConfig struct {
 	User         string
 	Password     string
@@ -48,28 +63,24 @@ func (d *DatabaseConfig) validate() error {
 	return nil
 }
 
-func (d *DatabaseConfig) getEndpoint() string {
+func (d *DatabaseConfig) getEndpointString() string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", d.User, d.Password, d.Host, d.Port, d.DatabaseName)
 }
 
-func Initialize() (db *sqlx.DB, err error) {
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	databaseName := os.Getenv("DB_NAME")
-
-	databaseConfig := NewDatabaseConfig(user, password, host, port, databaseName)
-	endpoint := databaseConfig.getEndpoint()
-
-	db, err = sqlx.Open("mysql", endpoint)
+func Initiate(initializer DatabaseInitializer) (db *sqlx.DB, err error) {
+	endPoint := getEndpoint()
+	db, err = sqlx.Open("mysql", endPoint)
 	if err != nil {
 		return nil, err
 	}
 	if err = db.Ping(); err != nil {
 		return nil, errors.New("failed to connect database: " + err.Error())
 	}
-	Root = db
+	if initializer != nil {
+		if err := initializer(db); err != nil {
+			return nil, errors.New("failed to initialize database: " + err.Error())
+		}
+	}
 	return db, nil
 }
 

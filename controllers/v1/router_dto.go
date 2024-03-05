@@ -28,6 +28,7 @@ type GetSummonerInfoResponseDto struct {
 	FlexRank *service.SummonerRankVO     `json:"flexRank"`
 	Mastery  []service.SummonerMasteryVO `json:"mastery"`
 	Matches  []service.MatchSummaryVO    `json:"matches"`
+	Extra    service.SummonerExtraVO     `json:"extra"`
 }
 
 type GetSummonerInfoByPuuidRequestDto struct {

@@ -51,6 +51,7 @@ var (
 		TierGrandmaster: {RankI},
 		TierChallenger:  {RankI},
 	}
+	Ranks                  = []Rank{RankI, RankII, RankIII, RankIV}
 	TierBaseRatingPointMap = func() map[Tier]int64 {
 		m := make(map[Tier]int64)
 		ratingPoint := int64(0)

@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
 	"path"
@@ -15,9 +16,10 @@ import (
 const StatisticsDataPath = "datafiles/statistics"
 
 var (
-	ChampionStatisticsRepo = NewChampionStatisticsRepository()
-	TierStatisticsRepo     = NewTierStatisticsRepository()
-	MasteryStatisticsRepo  = NewMasteryStatisticsRepository()
+	StatisticsDB           *sqlx.DB = nil
+	ChampionStatisticsRepo          = NewChampionStatisticsRepository()
+	TierStatisticsRepo              = NewTierStatisticsRepository()
+	MasteryStatisticsRepo           = NewMasteryStatisticsRepository()
 )
 
 func keyPath(key string) string {
