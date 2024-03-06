@@ -15,9 +15,9 @@ type SummonerSummaryVO struct {
 }
 
 type SummonerRankingVO struct {
-	RatingPoints float64 `json:"ratingPoints"`
-	Ranking      int     `json:"ranking"`
-	Total        int     `json:"total"`
+	RatingPoints int `json:"ratingPoints"`
+	Ranking      int `json:"ranking"`
+	Total        int `json:"total"`
 }
 
 type SummonerRankVO struct {

@@ -83,6 +83,7 @@ func GetSummonerSpellIcon(c *gin.Context) {
 		return
 	}
 
+	c.Header("Cache-Control", "public, max-age=31536000")
 	c.Data(http.StatusOK, "image/png", imgBytes)
 }
 
@@ -104,6 +105,7 @@ func GetItemIcon(c *gin.Context) {
 		return
 	}
 
+	c.Header("Cache-Control", "public, max-age=31536000")
 	c.Data(http.StatusOK, "image/png", imgBytes)
 }
 

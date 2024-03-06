@@ -3,39 +3,82 @@ package service
 import (
 	"database/sql"
 	"errors"
+	"team.gg-server/core"
 	"team.gg-server/libs/db"
+	"team.gg-server/models"
+	"team.gg-server/util"
+	"time"
 )
 
 func GetSummonerSoloRankingMXDAO(puuid string) (*SummonerRankingMXDAO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
 	var rankingMXDAO SummonerRankingMXDAO
-	if err := db.Root.Get(&rankingMXDAO, `
-		WITH rank_data AS (
-			SELECT
-				s.puuid,
-				s.game_name,
-				s.tag_line,
-				l.tier,
-				l.league_rank,
-				IF(ISNULL(l.league_rank), 0, l.league_points) as league_points,
-				IF(ISNULL(l.league_rank), 0, (str.score + l.league_points)) as rating_points,
-				ROW_NUMBER() OVER (ORDER BY IF(ISNULL(l.league_rank), 0, (str.score + l.league_points)) DESC) as ranking
-			FROM
-				summoners s
-			LEFT JOIN
-				leagues l ON s.puuid = l.puuid AND l.queue_type = ?
-			LEFT JOIN
-				static_tier_ranks str ON l.tier = str.tier_label AND l.league_rank = str.rank_label
-		), total_rankers AS (
-			SELECT COUNT(*) as total FROM rank_data
-		)
-		SELECT rank_data.*, total_rankers.total
-		FROM rank_data, total_rankers
-		WHERE rank_data.puuid = ?;
-	`, RankTypeSolo, puuid); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
+	summonerRankingDAO, found, err := models.GetSummonerRankingDAO(db.Root, puuid)
+	if err != nil {
 		return nil, err
+	}
+
+	needUpdate := !found
+	if found {
+		if time.Now().Sub(summonerRankingDAO.UpdatedAt) > SummonerRankingRevisionPeriod {
+			needUpdate = true
+		}
+	}
+
+	if needUpdate {
+		// TODO :: optimize query (too long latency > 10s)
+		if err := db.Root.Get(&rankingMXDAO, `
+			WITH filtered_leagues AS (
+				SELECT *
+				FROM leagues
+				WHERE queue_type = ?
+			),
+			rank_data AS (
+				SELECT
+					s.puuid,
+					IF(ISNULL(fl.league_rank), 0, (str.score + fl.league_points)) as rating_points,
+					ROW_NUMBER() OVER (ORDER BY IF(ISNULL(fl.league_rank), 0, (str.score + fl.league_points)) DESC) as ranking
+				FROM
+					summoners s
+				LEFT JOIN
+					filtered_leagues fl ON s.puuid = fl.puuid
+				LEFT JOIN
+					static_tier_ranks str ON fl.tier = str.tier_label AND fl.league_rank = str.rank_label
+			),
+			total_rankers AS (
+				SELECT COUNT(*) as total FROM rank_data
+			)
+			SELECT rank_data.*, total_rankers.total
+			FROM rank_data, total_rankers
+			WHERE rank_data.puuid = ?;
+		`, RankTypeSolo, puuid); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, nil
+			}
+			return nil, err
+		}
+
+		// upsert ranking
+		summonerRankingDAO = &models.SummonerRankingDAO{
+			Puuid:       puuid,
+			RatingPoint: rankingMXDAO.RatingPoints,
+			Ranking:     rankingMXDAO.Ranking,
+			Total:       rankingMXDAO.Total,
+			UpdatedAt:   time.Now(),
+		}
+		if err := summonerRankingDAO.Upsert(db.Root); err != nil {
+			return nil, err
+		}
+	} else {
+		rankingMXDAO = SummonerRankingMXDAO{
+			Puuid:        summonerRankingDAO.Puuid,
+			RatingPoints: summonerRankingDAO.RatingPoint,
+			Ranking:      summonerRankingDAO.Ranking,
+			Total:        summonerRankingDAO.Total,
+		}
 	}
 
 	return &rankingMXDAO, nil

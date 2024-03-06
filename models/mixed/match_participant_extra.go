@@ -192,8 +192,8 @@ func (m *MatchParticipantExtraMXDAO) GetScore() float64 {
 	return finalScore
 }
 
-func GetRecentMatchParticipantExtraMXDAOs(puuid string, count int) ([]*MatchParticipantExtraMXDAO, error) {
-	var details []*MatchParticipantExtraMXDAO
+func getRecentMatchParticipantExtraMXDAOs(puuid string, count int) ([]MatchParticipantExtraMXDAO, error) {
+	var details []MatchParticipantExtraMXDAO
 	if err := db.Root.Select(&details, `
 		SELECT m.*, mp.*, mpd.*
 		FROM summoners s
@@ -205,31 +205,34 @@ func GetRecentMatchParticipantExtraMXDAOs(puuid string, count int) ([]*MatchPart
 		LIMIT ?;
 	`, puuid, count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchParticipantExtraMXDAO, 0), nil
+			return make([]MatchParticipantExtraMXDAO, 0), nil
 		}
 		return nil, err
 	}
 	return details, nil
 }
 
-func GetMatchParticipantExtraMXDAO_byMatchId(matchId, puuid string) (*MatchParticipantExtraMXDAO, error) {
-	var detail MatchParticipantExtraMXDAO
-	if err := db.Root.Get(&detail, `
-		SELECT m.*, mp.*, mpd.*
-		FROM matches m
-		LEFT JOIN match_participants mp ON mp.match_id = m.match_id
-		LEFT JOIN match_participant_details mpd ON mp.match_participant_id = mpd.match_participant_id
-		WHERE m.match_id = ? AND puuid = ?
-		ORDER BY m.game_end_timestamp DESC
-		LIMIT 1;
-	`, matchId, puuid); err != nil {
-		return nil, err
-	}
-	return &detail, nil
-}
+//func GetMatchParticipantExtraMXDAO_byMatchId(matchId, puuid string) (*MatchParticipantExtraMXDAO, error) {
+//	var detail MatchParticipantExtraMXDAO
+//	if err := db.Root.Get(&detail, `
+//		SELECT m.*, mp.*, mpd.*
+//		FROM matches m
+//		LEFT JOIN match_participants mp ON mp.match_id = m.match_id
+//		LEFT JOIN match_participant_details mpd ON mp.match_participant_id = mpd.match_participant_id
+//		WHERE m.match_id = ? AND puuid = ?
+//		ORDER BY m.game_end_timestamp DESC
+//		LIMIT 1;
+//	`, matchId, puuid); err != nil {
+//		return nil, err
+//	}
+//	return &detail, nil
+//}
 
-func GetMatchParticipantExtraMXDAOs_byMatchId(matchId string) ([]*MatchParticipantExtraMXDAO, error) {
-	var details []*MatchParticipantExtraMXDAO
+func GetMatchParticipantExtraMXDAOs_byMatchId(matchId string) ([]MatchParticipantExtraMXDAO, error) {
+	//if core.DebugOnProd {
+	//	defer util.InspectFunctionExecutionTime()()
+	//}
+	var details []MatchParticipantExtraMXDAO
 	if err := db.Root.Select(&details, `
 		SELECT m.*, mp.*, mpd.*
 		FROM matches m
@@ -239,19 +242,18 @@ func GetMatchParticipantExtraMXDAOs_byMatchId(matchId string) ([]*MatchParticipa
 		ORDER BY m.game_end_timestamp DESC;
 	`, matchId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchParticipantExtraMXDAO, 0), nil
+			return make([]MatchParticipantExtraMXDAO, 0), nil
 		}
 		return nil, err
 	}
 	return details, nil
 }
 
-func GetMatchParticipantExtraMXDAOs_byQueueId(puuid string, queueId, count int) ([]*MatchParticipantExtraMXDAO, error) {
+func GetMatchParticipantExtraMXDAOs_byQueueId(puuid string, queueId, count int) ([]MatchParticipantExtraMXDAO, error) {
 	if queueId == 0 {
-		return GetRecentMatchParticipantExtraMXDAOs(puuid, count)
+		return getRecentMatchParticipantExtraMXDAOs(puuid, count)
 	}
-
-	var details []*MatchParticipantExtraMXDAO
+	var details []MatchParticipantExtraMXDAO
 	if err := db.Root.Select(&details, `
 		SELECT m.*, mp.*, mpd.*
 		FROM summoners s
@@ -263,7 +265,7 @@ func GetMatchParticipantExtraMXDAOs_byQueueId(puuid string, queueId, count int) 
 		LIMIT ?;
 	`, puuid, queueId, count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchParticipantExtraMXDAO, 0), nil
+			return make([]MatchParticipantExtraMXDAO, 0), nil
 		}
 		return nil, err
 	}

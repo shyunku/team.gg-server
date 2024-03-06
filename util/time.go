@@ -33,25 +33,19 @@ func (t *Timer) Start() {
 }
 
 func (t *Timer) End() {
-	if t.isEnded() {
-		log.Errorf("timer %s already ended", t.Name)
-		return
-	}
 	now := time.Now()
 	t.EndTime = &now
 }
 
-func (t *Timer) isEnded() bool {
-	return t.EndTime != nil
-}
-
 func (t *Timer) GetDuration() time.Duration {
-	if !t.isEnded() {
-		t.End()
-	}
+	t.End()
 	return t.EndTime.Sub(*t.StartTime)
 }
 
 func (t *Timer) GetDurationString() string {
 	return t.GetDuration().String()
+}
+
+func (t *Timer) PrintDuration() {
+	log.Infof("%s: %s", t.Name, t.GetDurationString())
 }

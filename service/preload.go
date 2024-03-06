@@ -46,7 +46,9 @@ var (
 						rank_label VARCHAR(20) NOT NULL,
 						score INT NOT NULL,
 						UNIQUE KEY (tier_label, rank_label),
-						UNIQUE KEY (score)
+						UNIQUE KEY (score),
+						INDEX (tier_label),
+						INDEX (rank_label)
 					)
 				`); err != nil {
 					log.Error(err)

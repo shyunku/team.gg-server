@@ -3,9 +3,11 @@ package service
 import (
 	"fmt"
 	log "github.com/shyunku-libraries/go-logger"
+	"team.gg-server/core"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/models/mixed"
+	"team.gg-server/util"
 )
 
 // vo_getters configure vo with VAO and mixed-VAO (null-safe)
@@ -25,6 +27,10 @@ func GetSummonerSummaryVO_byName(summonerName string) (*SummonerSummaryVO, error
 }
 
 func GetSummonerSummaryVO_byPuuid(puuid string) (*SummonerSummaryVO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
 	// find summoner by name on db
 	summonerDao, exists, err := models.GetSummonerDAO_byPuuid(db.Root, puuid)
 	if err != nil {
@@ -39,6 +45,10 @@ func GetSummonerSummaryVO_byPuuid(puuid string) (*SummonerSummaryVO, error) {
 }
 
 func GetSummonerExtraVO(puuid string) (*SummonerExtraVO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
 	rankingVO, err := getSummonerRankingVO(puuid)
 	if err != nil {
 		log.Error(err)
@@ -78,6 +88,12 @@ func getSummonerRankingVO(puuid string) (*SummonerRankingVO, error) {
 // GetSummonerRankVO returns SummonerRankVO by puuid and rankType
 // this function assumes that summoner info & rank info has consistency
 func GetSummonerRankVO(puuid string, rankType string) (*SummonerRankVO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
 	leagueDAO, exists, err := models.GetLeagueDAO(db.Root, puuid, rankType)
 	if err != nil {
 		log.Error(err)
@@ -95,6 +111,9 @@ func GetSummonerRankVO(puuid string, rankType string) (*SummonerRankVO, error) {
 }
 
 func GetSummonerMasteryVOs(puuid string) ([]SummonerMasteryVO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
 	masteries, err := models.GetMasteryDAOs(db.Root, puuid)
 	if err != nil {
 		log.Error(err)
@@ -109,7 +128,10 @@ func GetSummonerMasteryVOs(puuid string) ([]SummonerMasteryVO, error) {
 
 // GetSummonerRecentMatchSummaryVOs_byQueueId 특정 플레이어의 최근 특정 큐 (ex. 솔랭, 자랭) 의 최근 매치 요약 정보를 가져옵니다.
 func GetSummonerRecentMatchSummaryVOs_byQueueId(puuid string, queueId, count int) ([]MatchSummaryVO, error) {
-	var matchDAOs []*models.MatchDAO
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+	var matchDAOs []models.MatchDAO
 	var err error
 	if queueId == QueueTypeAll {
 		matchDAOs, err = models.GetMatchDAOs_byPuuid(db.Root, puuid, count)
@@ -125,7 +147,7 @@ func GetSummonerRecentMatchSummaryVOs_byQueueId(puuid string, queueId, count int
 
 // GetSummonerMatchSummaryVOs_byQueueId_before 특정 시간 이전의 매치 요약 정보를 가져옵니다.
 func GetSummonerMatchSummaryVOs_byQueueId_before(puuid string, queueId int, before int64, count int) ([]MatchSummaryVO, error) {
-	var matchDAOs []*models.MatchDAO
+	var matchDAOs []models.MatchDAO
 	var err error
 	if queueId == QueueTypeAll {
 		matchDAOs, err = models.GetMatchDAOs_byPuuid_before(db.Root, puuid, before, count)
@@ -139,15 +161,18 @@ func GetSummonerMatchSummaryVOs_byQueueId_before(puuid string, queueId int, befo
 	return getSummonerMatchSummaryVOs(puuid, matchDAOs)
 }
 
-func getSummonerMatchSummaryVOs(puuid string, matchDAOs []*models.MatchDAO) ([]MatchSummaryVO, error) {
-	matchSummaryVOs := make([]MatchSummaryVO, 0)
-	for _, matchDAO := range matchDAOs {
+func getSummonerMatchSummaryVOs(puuid string, matchDAOs []models.MatchDAO) ([]MatchSummaryVO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
+	promise := util.NewPromise[models.MatchDAO, MatchSummaryVO]()
+	getMatchSummary := func(resolve chan<- MatchSummaryVO, reject chan<- error, matchDAO models.MatchDAO) {
 		matchExtraMXDAOs, err := mixed.GetMatchParticipantExtraMXDAOs_byMatchId(matchDAO.MatchId)
 		if err != nil {
 			log.Error(err)
-			return nil, err
+			reject <- err
 		}
-
 		var myStat *TeammateVO
 		team1Participants := make([]TeammateVO, 0)
 		team2Participants := make([]TeammateVO, 0)
@@ -155,6 +180,7 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []*models.MatchDAO) ([]M
 			perks, err := models.GetMatchParticipantPerkStyleDAOs(db.Root, matchExtraDAO.MatchParticipantId)
 			if err != nil {
 				log.Warn(err)
+				reject <- err
 			}
 			primaryPerkStyle := 0
 			subPerkStyle := 0
@@ -165,8 +191,7 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []*models.MatchDAO) ([]M
 					subPerkStyle = perk.Style
 				}
 			}
-
-			teamMate := SummonerMatchSummaryTeamMateMixer(*matchExtraDAO, primaryPerkStyle, subPerkStyle)
+			teamMate := SummonerMatchSummaryTeamMateMixer(matchExtraDAO, primaryPerkStyle, subPerkStyle)
 			if matchExtraDAO.TeamId == 100 {
 				team1Participants = append(team1Participants, teamMate)
 			} else {
@@ -177,17 +202,29 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []*models.MatchDAO) ([]M
 				myStat = &teamMate
 			}
 		}
-
 		if myStat == nil {
-			return nil, fmt.Errorf("myStat is nil")
+			reject <- fmt.Errorf("myStat is nil")
 		}
 
-		matchSummaryVOs = append(matchSummaryVOs, SummonerMatchSummaryMixer(
-			*matchDAO,
+		resolve <- SummonerMatchSummaryMixer(
+			matchDAO,
 			*myStat,
 			team1Participants,
 			team2Participants,
-		))
+		)
+	}
+
+	for _, matchDAO := range matchDAOs {
+		promise.Add(getMatchSummary, matchDAO)
+	}
+
+	matchSummaryVOs := make([]MatchSummaryVO, 0)
+	for _, result := range promise.All() {
+		if result.Err != nil {
+			log.Error(result.Err)
+			return nil, result.Err
+		}
+		matchSummaryVOs = append(matchSummaryVOs, *result.Result)
 	}
 
 	return matchSummaryVOs, nil

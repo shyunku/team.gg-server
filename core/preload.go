@@ -10,6 +10,7 @@ var (
 	AppServerHost string
 	AppServerPort = os.Getenv("APP_SERVER_PORT")
 	DebugMode     = false
+	DebugOnProd   = false
 	UrgentMode    = false
 )
 
@@ -24,6 +25,12 @@ func Preload() error {
 
 	// load debug mode
 	DebugMode = os.Getenv("DEBUG") == "true"
+
+	// load debug on prod
+	DebugOnProd = os.Getenv("DEBUG_ON_PRODUCTION") == "true"
+	if DebugMode {
+		DebugOnProd = true
+	}
 
 	// load urgent mode
 	UrgentMode = os.Getenv("URGENT") == "true"

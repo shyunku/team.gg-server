@@ -1,16 +1,10 @@
 package service
 
 type SummonerRankingMXDAO struct {
-	Puuid        string  `db:"puuid" json:"puuid"`
-	GameName     string  `db:"game_name" json:"gameName"`
-	TagLine      string  `db:"tag_line" json:"tagLine"`
-	Tier         *string `db:"tier" json:"tier"`
-	LeagueRank   *string `db:"league_rank" json:"leagueRank"`
-	LeaguePoints int     `db:"league_points" json:"leaguePoints"`
-
-	RatingPoints float64 `db:"rating_points" json:"ratingPoints"`
-	Ranking      int     `db:"ranking" json:"ranking"`
-	Total        int     `db:"total" json:"total"`
+	Puuid        string `db:"puuid" json:"puuid"`
+	RatingPoints int    `db:"rating_points" json:"ratingPoints"`
+	Ranking      int    `db:"ranking" json:"ranking"`
+	Total        int    `db:"total" json:"total"`
 }
 
 type ChampionStatisticMXDAO struct {

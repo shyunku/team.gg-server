@@ -25,8 +25,13 @@ func (m *MatchParticipantPerkStyleDAO) Insert(db db.Context) error {
 }
 
 func GetMatchParticipantPerkStyleDAOs(db db.Context, matchParticipantId string) ([]*MatchParticipantPerkStyleDAO, error) {
+	//if core.DebugOnProd {
+	//	defer util.InspectFunctionExecutionTime()()
+	//}
 	var matchParticipantPerkStyles []*MatchParticipantPerkStyleDAO
-	if err := db.Select(&matchParticipantPerkStyles, "SELECT * FROM match_participant_perk_styles WHERE match_participant_id = ?", matchParticipantId); err != nil {
+	if err := db.Select(&matchParticipantPerkStyles, `
+		SELECT * FROM match_participant_perk_styles WHERE match_participant_id = ?
+	`, matchParticipantId); err != nil {
 		return nil, err
 	}
 	return matchParticipantPerkStyles, nil

@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"team.gg-server/controllers/socket"
+	"team.gg-server/core"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/third_party/riot/api"
@@ -19,6 +20,10 @@ import (
 // RenewSummonerTotal updates summoner info, league, mastery, matches
 // you should use db context with transaction (to prevent inconsistency)
 func RenewSummonerTotal(tx *sqlx.Tx, puuid string) error {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
 	// update summoner info
 	summonerDAO, _, err := RenewSummonerInfoByPuuid(tx, puuid)
 	if err != nil {
@@ -217,23 +222,25 @@ func RenewSummonerMatchesIfNecessary(db db.Context, puuid string, matchIdList []
 	if len(uncachedMatchIds) > 0 {
 		timer := util.NewTimerWithName("summoner_match_renewal")
 		timer.Start()
-		resultChan := make(chan riotSummonerMatchResult, len(uncachedMatchIds))
+
+		promise := util.NewPromise[string, api.MatchDto]()
 		for _, matchId := range uncachedMatchIds {
-			go fetchSummonerMatchesFromRiot(matchId, resultChan)
+			promise.Add(fetchSummonerMatchesFromRiot, matchId)
 		}
 
-		uncachedMatches := make([]*api.MatchDto, 0)
-		for range uncachedMatchIds {
-			result := <-resultChan
-			if result.err != nil {
-				log.Error(result.err)
-				return result.err
-			} else if result.match != nil {
-				//log.Debugf("<- found match (%s) from riot", result.match.Metadata.MatchId)
-				uncachedMatches = append(uncachedMatches, result.match)
+		uncachedMatches := make([]api.MatchDto, 0)
+		for _, result := range promise.All() {
+			if result.Err != nil {
+				log.Error(result.Err)
+				return result.Err
 			}
+			//log.Debugf("<- found match (%s) from riot", result.match.Metadata.MatchId)
+			uncachedMatches = append(uncachedMatches, *result.Result)
 		}
-		log.Debugf("Fetched %d uncached matches in %s", len(uncachedMatchIds), timer.GetDurationString())
+
+		if core.DebugOnProd {
+			log.Debugf("Fetched %d uncached matches in %s", len(uncachedMatchIds), timer.GetDurationString())
+		}
 
 		for _, match := range uncachedMatches {
 			if err := saveMatchToLocalDB(db, puuid, match); err != nil {
@@ -253,23 +260,17 @@ func RenewSummonerMatchesIfNecessary(db db.Context, puuid string, matchIdList []
 	return nil
 }
 
-func fetchSummonerMatchesFromRiot(matchId string, resultChan chan<- riotSummonerMatchResult) {
+func fetchSummonerMatchesFromRiot(resolve chan<- api.MatchDto, reject chan<- error, matchId string) {
 	match, err := api.GetMatchByMatchId(matchId)
 	if err != nil {
 		log.Error(err)
-		resultChan <- riotSummonerMatchResult{
-			match: nil,
-			err:   err,
-		}
+		reject <- err
 	} else {
-		resultChan <- riotSummonerMatchResult{
-			match: match,
-			err:   nil,
-		}
+		resolve <- *match
 	}
 }
 
-func saveMatchToLocalDB(db db.Context, puuid string, match *api.MatchDto) error {
+func saveMatchToLocalDB(db db.Context, puuid string, match api.MatchDto) error {
 	matchId := match.Metadata.MatchId
 	matchDAO := &models.MatchDAO{
 		MatchId:            matchId,

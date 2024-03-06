@@ -34,7 +34,6 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// Create Jwt secret key if needed
-	//crypto.PrintNewJwtSecret()
 
 	// Load environment variables
 	log.Info("Initializing environments...")

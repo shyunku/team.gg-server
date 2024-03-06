@@ -3,7 +3,9 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"team.gg-server/core"
 	"team.gg-server/libs/db"
+	"team.gg-server/util"
 )
 
 type MatchDAO struct {
@@ -49,21 +51,24 @@ func GetMatchDAO(db db.Context, matchId string) (*MatchDAO, bool, error) {
 	return &matchEntity, true, nil
 }
 
-func GetSummonerMatchDAOs_before(db db.Context, puuid string, before int64, limit int64) ([]*MatchDAO, error) {
-	var matches []*MatchDAO
-	if err := db.Select(&matches, `
-		SELECT m.*
-		FROM summoner_matches sm
-		LEFT JOIN matches m ON sm.match_id = m.match_id
-		WHERE sm.puuid = ?
-		AND m.game_end_timestamp < ?
-		ORDER BY m.game_end_timestamp DESC 
-		LIMIT ?;
-	`, puuid, before, limit); err != nil {
-		return nil, err
-	}
-	return matches, nil
-}
+//func GetSummonerMatchDAOs_before(db db.Context, puuid string, before int64, limit int64) ([]MatchDAO, error) {
+//	var matches []MatchDAO
+//	if err := db.Select(&matches, `
+//		SELECT m.*
+//		FROM summoner_matches sm
+//		LEFT JOIN matches m ON sm.match_id = m.match_id
+//		WHERE sm.puuid = ?
+//		AND m.game_end_timestamp < ?
+//		ORDER BY m.game_end_timestamp DESC
+//		LIMIT ?;
+//	`, puuid, before, limit); err != nil {
+//		if errors.Is(err, sql.ErrNoRows) {
+//			return make([]MatchDAO, 0), nil
+//		}
+//		return nil, err
+//	}
+//	return matches, nil
+//}
 
 // GetOldestSummonerMatchDAO returns the oldest match for a summoner
 func GetOldestSummonerMatchDAO(db db.Context, puuid string) (*MatchDAO, bool, error) {
@@ -84,8 +89,12 @@ func GetOldestSummonerMatchDAO(db db.Context, puuid string) (*MatchDAO, bool, er
 	return &matchEntity, true, nil
 }
 
-func GetMatchDAOs_byPuuid(db db.Context, puuid string, count int) ([]*MatchDAO, error) {
-	var matches []*MatchDAO
+func GetMatchDAOs_byPuuid(db db.Context, puuid string, count int) ([]MatchDAO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
+	var matches []MatchDAO
 	if err := db.Select(&matches, `
 		SELECT m.*
 		FROM summoner_matches sm
@@ -95,15 +104,19 @@ func GetMatchDAOs_byPuuid(db db.Context, puuid string, count int) ([]*MatchDAO, 
 		LIMIT ?;
 	`, puuid, count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchDAO, 0), nil
+			return make([]MatchDAO, 0), nil
 		}
 		return nil, err
 	}
 	return matches, nil
 }
 
-func GetMatchDAOs_byPuuid_before(db db.Context, puuid string, before int64, count int) ([]*MatchDAO, error) {
-	var matches []*MatchDAO
+func GetMatchDAOs_byPuuid_before(db db.Context, puuid string, before int64, count int) ([]MatchDAO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
+	var matches []MatchDAO
 	if err := db.Select(&matches, `
 		SELECT m.*
 		FROM summoner_matches sm
@@ -114,15 +127,19 @@ func GetMatchDAOs_byPuuid_before(db db.Context, puuid string, before int64, coun
 		LIMIT ?;
 	`, puuid, before, count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchDAO, 0), nil
+			return make([]MatchDAO, 0), nil
 		}
 		return nil, err
 	}
 	return matches, nil
 }
 
-func GetMatchDAOs_byQueueId(db db.Context, puuid string, queueId, count int) ([]*MatchDAO, error) {
-	var matches []*MatchDAO
+func GetMatchDAOs_byQueueId(db db.Context, puuid string, queueId, count int) ([]MatchDAO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
+	var matches []MatchDAO
 	if err := db.Select(&matches, `
 		SELECT m.*
 		FROM summoner_matches sm
@@ -133,15 +150,19 @@ func GetMatchDAOs_byQueueId(db db.Context, puuid string, queueId, count int) ([]
 		LIMIT ?;
 	`, puuid, queueId, count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchDAO, 0), nil
+			return make([]MatchDAO, 0), nil
 		}
 		return nil, err
 	}
 	return matches, nil
 }
 
-func GetMatchDAOs_byQueueId_before(db db.Context, puuid string, queueId int, before int64, count int) ([]*MatchDAO, error) {
-	var matches []*MatchDAO
+func GetMatchDAOs_byQueueId_before(db db.Context, puuid string, queueId int, before int64, count int) ([]MatchDAO, error) {
+	if core.DebugOnProd {
+		defer util.InspectFunctionExecutionTime()()
+	}
+
+	var matches []MatchDAO
 	if err := db.Select(&matches, `
 		SELECT m.*
 		FROM summoner_matches sm
@@ -153,7 +174,7 @@ func GetMatchDAOs_byQueueId_before(db db.Context, puuid string, queueId int, bef
 		LIMIT ?;
 	`, puuid, queueId, before, count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]*MatchDAO, 0), nil
+			return make([]MatchDAO, 0), nil
 		}
 		return nil, err
 	}
