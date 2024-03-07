@@ -59,7 +59,7 @@ func SummonerMasteryMixer(d models.MasteryDAO) SummonerMasteryVO {
 	}
 }
 
-func SummonerMatchSummaryTeamMateMixer(e mixed.MatchParticipantExtraMXDAO, primaryPerkStyle, subPerkStyle int) TeammateVO {
+func SummonerMatchSummaryTeamMateMixer(e mixed.MatchParticipantExtraMXDAO, summonerRankVO *SummonerRankVO, primaryPerkStyle, subPerkStyle int) TeammateVO {
 	return TeammateVO{
 		MatchId:                        e.MatchId,
 		DataVersion:                    e.DataVersion,
@@ -182,6 +182,7 @@ func SummonerMatchSummaryTeamMateMixer(e mixed.MatchParticipantExtraMXDAO, prima
 		WardsKilled:                    e.WardsKilled,
 		WardsPlaced:                    e.WardsPlaced,
 		GGScore:                        e.GetScore(),
+		SummonerRank:                   summonerRankVO,
 		PerkVO: PerkVO{
 			PrimaryPerkStyle: primaryPerkStyle,
 			SubPerkStyle:     subPerkStyle,
@@ -189,12 +190,13 @@ func SummonerMatchSummaryTeamMateMixer(e mixed.MatchParticipantExtraMXDAO, prima
 	}
 }
 
-func SummonerMatchSummaryMixer(d models.MatchDAO, myStat TeammateVO, team1 []TeammateVO, team2 []TeammateVO) MatchSummaryVO {
+func SummonerMatchSummaryMixer(d models.MatchDAO, matchAvgTierRank *SummonerRankVO, myStat TeammateVO, team1 []TeammateVO, team2 []TeammateVO) MatchSummaryVO {
 	return MatchSummaryVO{
 		MatchId:            d.MatchId,
 		GameStartTimestamp: d.GameStartTimestamp,
 		GameEndTimestamp:   d.GameEndTimestamp,
 		GameDuration:       d.GameDuration,
+		MatchAvgTierRank:   matchAvgTierRank,
 		QueueId:            d.QueueId,
 		MyStat:             myStat,
 		Team1:              team1,

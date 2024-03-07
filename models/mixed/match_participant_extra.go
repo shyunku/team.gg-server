@@ -146,7 +146,7 @@ func (m *MatchParticipantExtraMXDAO) GetScore() float64 {
 	objectCutLine := 30000
 	tankerCutLine := 150000
 	wardCutLine := 120
-	ccCutLine := 2400
+	ccCutLine := 3600
 
 	gameDurationFactor := 3600 / float64(m.GameDuration)
 

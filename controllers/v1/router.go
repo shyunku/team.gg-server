@@ -135,7 +135,7 @@ func GetSummonerInfo(c *gin.Context) {
 		return
 	}
 
-	extraVO, err := service.GetSummonerExtraVO(summonerDAO.Puuid)
+	extraVO, err := service.GetSummonerExtraVO(summonerDAO.Puuid, soloRankVO)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")

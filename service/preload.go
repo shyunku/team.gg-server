@@ -90,7 +90,15 @@ var (
 			return tierLevelI < tierLevelJ
 		})
 		for _, tier := range tierKeys {
-			ranks := TierRankMap[tier]
+			originalRanks, ok := TierRankMap[tier]
+			if !ok {
+				log.Fatal(fmt.Errorf("tier not found: %s", tier))
+				_ = tx.Rollback()
+				os.Exit(-4)
+			}
+
+			ranks := make([]Rank, len(originalRanks))
+			copy(ranks, originalRanks)
 
 			sort.SliceStable(ranks, func(i, j int) bool {
 				rankLevelI, err := GetRankLevel(tier, ranks[i])
@@ -108,7 +116,13 @@ var (
 				return rankLevelI < rankLevelJ
 			})
 			for _, rank := range ranks {
-				ratingPoint, err := CalculateRatingPoint(string(tier), string(rank), 0)
+				lp := 0
+				if tier == TierGrandmaster {
+					lp = TierHighGrandmasterUnderBound
+				} else if tier == TierChallenger {
+					lp = TierHighChallengerUnderBound
+				}
+				ratingPoint, err := CalculateRatingPoint(string(tier), string(rank), lp)
 				if err != nil {
 					log.Error(err)
 					_ = tx.Rollback()

@@ -44,9 +44,6 @@ func (p *Promise[T, K]) All() []PromiseResult[K] {
 		case err := <-rejectChans[i]:
 			results[i] = PromiseResult[K]{Result: nil, Err: err}
 		}
-
-		close(resolveChans[i])
-		close(rejectChans[i])
 	}
 
 	return results

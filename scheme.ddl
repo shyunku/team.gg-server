@@ -236,6 +236,25 @@ create index matches_game_end_timestamp_index
 create index matches_game_start_timestamp_index
     on matches (game_start_timestamp);
 
+create table static_tier_ranks
+(
+    id         int auto_increment
+        primary key,
+    tier_label varchar(20) not null,
+    rank_label varchar(20) not null,
+    score      int         not null,
+    constraint score
+        unique (score),
+    constraint tier_label
+        unique (tier_label, rank_label)
+);
+
+create index rank_label
+    on static_tier_ranks (rank_label);
+
+create index tier_label_2
+    on static_tier_ranks (tier_label);
+
 create table summoners
 (
     account_id        varchar(255) not null,
@@ -277,6 +296,9 @@ create table leagues
             on update cascade on delete cascade
 );
 
+create index leagues_queue_type_index
+    on leagues (queue_type);
+
 create index leagues_queue_type_tier_league_rank_league_points_wins_index
     on leagues (queue_type asc, tier asc, league_rank asc, league_points desc, wins desc);
 
@@ -311,6 +333,34 @@ create table summoner_matches
         foreign key (puuid) references summoners (puuid)
             on update cascade on delete cascade
 );
+
+create table summoner_rankings
+(
+    puuid        varchar(255) not null
+        primary key,
+    ranking      int          not null,
+    rating_point int          not null,
+    total        int          not null,
+    updated_at   datetime     not null,
+    constraint summoner_rankings_summoners_puuid_fk
+        foreign key (puuid) references summoners (puuid)
+            on update cascade on delete cascade
+);
+
+create index summoners_game_name_index
+    on summoners (game_name desc);
+
+create index summoners_name_index
+    on summoners (name desc);
+
+create index summoners_shorten_game_name_index
+    on summoners (shorten_game_name desc);
+
+create index summoners_shorten_name_index
+    on summoners (shorten_name desc);
+
+create index summoners_tag_line_index
+    on summoners (tag_line desc);
 
 create table users
 (

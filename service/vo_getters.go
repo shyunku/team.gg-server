@@ -44,7 +44,7 @@ func GetSummonerSummaryVO_byPuuid(puuid string) (*SummonerSummaryVO, error) {
 	return &summonerVo, nil
 }
 
-func GetSummonerExtraVO(puuid string) (*SummonerExtraVO, error) {
+func GetSummonerExtraVO(puuid string, soloRank *SummonerRankVO) (*SummonerExtraVO, error) {
 	if core.DebugOnProd {
 		defer util.InspectFunctionExecutionTime()()
 	}
@@ -62,16 +62,46 @@ func GetSummonerExtraVO(puuid string) (*SummonerExtraVO, error) {
 	}
 
 	ggScoreSum := 0.0
+	validGGScores := 0
+	ggScoreAvg := 0.0
 	for _, extraMXDAO := range matchParticipantExtraMXDAOs {
+		if extraMXDAO.GameEndedInEarlySurrender {
+			continue
+		}
 		ggScoreSum += extraMXDAO.GetScore()
+		validGGScores++
 	}
-	ggScoreAvg := ggScoreSum / float64(len(matchParticipantExtraMXDAOs))
+	if validGGScores > 0 {
+		ggScoreAvg = ggScoreSum / float64(validGGScores)
+	}
 
 	// TODO :: add some extra fun things (statistics: tags)
+
+	var predictedRankVO *SummonerRankVO
+	predictedMMR := 0.0
+	if ggScoreAvg > 0 && soloRank != nil {
+		predictedMMR = PredictMatchMakingRating(float64(soloRank.RatingPoint), ggScoreAvg)
+		reverseCalculatedRP := MMRtoRatingPoint(predictedMMR)
+		tier, rank, lp, err := CalculateTierRank(reverseCalculatedRP)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		predictedRankVO = &SummonerRankVO{
+			Tier:        string(tier),
+			Rank:        string(rank),
+			Lp:          int(lp),
+			RatingPoint: int64(reverseCalculatedRP),
+			Wins:        0,
+			Losses:      0,
+		}
+	}
 
 	return &SummonerExtraVO{
 		Ranking:          *rankingVO,
 		RecentAvgGGScore: ggScoreAvg,
+		PredictedMMR:     predictedMMR,
+		PredictedRank:    predictedRankVO,
 	}, nil
 }
 
@@ -173,10 +203,29 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []models.MatchDAO) ([]Ma
 			log.Error(err)
 			reject <- err
 		}
+
 		var myStat *TeammateVO
+		ratingPoint := 0.0
+		validRankers := 0
 		team1Participants := make([]TeammateVO, 0)
 		team2Participants := make([]TeammateVO, 0)
 		for _, matchExtraDAO := range matchExtraMXDAOs {
+			var summonerRankVO *SummonerRankVO
+			queueType := RankTypeSolo
+			if matchDAO.QueueId == QueueTypeFlex {
+				queueType = RankTypeFlex
+			}
+
+			summonerRankVO, err = GetSummonerRankVO(matchExtraDAO.Puuid, queueType)
+			if err != nil {
+				log.Error(err)
+				reject <- err
+			}
+			if summonerRankVO != nil {
+				ratingPoint += float64(summonerRankVO.RatingPoint)
+				validRankers++
+			}
+
 			perks, err := models.GetMatchParticipantPerkStyleDAOs(db.Root, matchExtraDAO.MatchParticipantId)
 			if err != nil {
 				log.Warn(err)
@@ -191,7 +240,7 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []models.MatchDAO) ([]Ma
 					subPerkStyle = perk.Style
 				}
 			}
-			teamMate := SummonerMatchSummaryTeamMateMixer(matchExtraDAO, primaryPerkStyle, subPerkStyle)
+			teamMate := SummonerMatchSummaryTeamMateMixer(matchExtraDAO, summonerRankVO, primaryPerkStyle, subPerkStyle)
 			if matchExtraDAO.TeamId == 100 {
 				team1Participants = append(team1Participants, teamMate)
 			} else {
@@ -206,8 +255,26 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []models.MatchDAO) ([]Ma
 			reject <- fmt.Errorf("myStat is nil")
 		}
 
+		var avgMatchRankVO *SummonerRankVO
+		if validRankers > 0 {
+			avgMatchRatingPoint := ratingPoint / float64(validRankers)
+			tier, rank, lp, err := CalculateTierRank(avgMatchRatingPoint)
+			if err != nil {
+				log.Error(err)
+				reject <- err
+			}
+
+			avgMatchRankVO = &SummonerRankVO{
+				Tier:        string(tier),
+				Rank:        string(rank),
+				Lp:          int(lp),
+				RatingPoint: int64(int(avgMatchRatingPoint)),
+			}
+		}
+
 		resolve <- SummonerMatchSummaryMixer(
 			matchDAO,
+			avgMatchRankVO,
 			*myStat,
 			team1Participants,
 			team2Participants,

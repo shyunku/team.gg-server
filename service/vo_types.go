@@ -39,6 +39,8 @@ type SummonerMasteryVO struct {
 type SummonerExtraVO struct {
 	Ranking          SummonerRankingVO `json:"ranking"`
 	RecentAvgGGScore float64           `json:"recentAvgGGScore"`
+	PredictedMMR     float64           `json:"predictedMMR"`
+	PredictedRank    *SummonerRankVO   `json:"predictedRank"`
 }
 
 type PerkVO struct {
@@ -174,19 +176,21 @@ type TeammateVO struct {
 	WardsPlaced                    int    `json:"wardsPlaced"`
 
 	// additional
-	GGScore float64 `json:"ggScore"`
+	GGScore      float64         `json:"ggScore"`
+	SummonerRank *SummonerRankVO `json:"summonerRank"`
 	PerkVO
 }
 
 type MatchSummaryVO struct {
-	MatchId            string       `json:"matchId"`
-	GameStartTimestamp int64        `json:"gameStartTimestamp"`
-	GameEndTimestamp   int64        `json:"gameEndTimestamp"`
-	GameDuration       int64        `json:"gameDuration"`
-	QueueId            int          `json:"queueId"`
-	MyStat             TeammateVO   `json:"myStat"`
-	Team1              []TeammateVO `json:"team1"`
-	Team2              []TeammateVO `json:"team2"`
+	MatchId            string          `json:"matchId"`
+	GameStartTimestamp int64           `json:"gameStartTimestamp"`
+	GameEndTimestamp   int64           `json:"gameEndTimestamp"`
+	GameDuration       int64           `json:"gameDuration"`
+	MatchAvgTierRank   *SummonerRankVO `json:"matchAvgTierRank"`
+	QueueId            int             `json:"queueId"`
+	MyStat             TeammateVO      `json:"myStat"`
+	Team1              []TeammateVO    `json:"team1"`
+	Team2              []TeammateVO    `json:"team2"`
 }
 
 type IngameParticipantVO struct {
