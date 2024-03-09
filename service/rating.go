@@ -102,22 +102,22 @@ var (
 	//	}
 	//	return nil
 	//}()
-	test2 = func() error {
-		i := 0
-		for {
-			if i > 5000 {
-				break
-			}
-			i += 30
-			tier, rank, lp, err := CalculateTierRank(float64(int64(i)))
-			if err != nil {
-				log.Fatal(err)
-				os.Exit(-1)
-			}
-			log.Debugf("ratingPoint: %d, tier: %s, rank: %s, lp: %d", i, tier, rank, lp)
-		}
-		return nil
-	}()
+	//test2 = func() error {
+	//	i := 0
+	//	for {
+	//		if i > 5000 {
+	//			break
+	//		}
+	//		i += 30
+	//		tier, rank, lp, err := CalculateTierRank(float64(int64(i)))
+	//		if err != nil {
+	//			log.Fatal(err)
+	//			os.Exit(-1)
+	//		}
+	//		log.Debugf("ratingPoint: %d, tier: %s, rank: %s, lp: %d", i, tier, rank, lp)
+	//	}
+	//	return nil
+	//}()
 )
 
 func IsValidTierRank(tier, rank string) bool {
