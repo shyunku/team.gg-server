@@ -12,6 +12,7 @@ import (
 	"team.gg-server/models"
 	"team.gg-server/service"
 	"team.gg-server/third_party/riot/api"
+	"team.gg-server/types"
 	"team.gg-server/util"
 	"time"
 )
@@ -131,14 +132,14 @@ func CreateCustomGameConfiguration(c *gin.Context) {
 		LineFairness:           0,
 		TierFairness:           0,
 		LineSatisfaction:       0,
-		LineFairnessWeight:     service.WeightLineFairness,
-		TierFairnessWeight:     service.WeightTierFairness,
-		LineSatisfactionWeight: service.WeightLineSatisfaction,
-		TopInfluenceWeight:     service.WeightTopInfluence,
-		JungleInfluenceWeight:  service.WeightJungleInfluence,
-		MidInfluenceWeight:     service.WeightMidInfluence,
-		AdcInfluenceWeight:     service.WeightAdcInfluence,
-		SupportInfluenceWeight: service.WeightSupportInfluence,
+		LineFairnessWeight:     types.WeightLineFairness,
+		TierFairnessWeight:     types.WeightTierFairness,
+		LineSatisfactionWeight: types.WeightLineSatisfaction,
+		TopInfluenceWeight:     types.WeightTopInfluence,
+		JungleInfluenceWeight:  types.WeightJungleInfluence,
+		MidInfluenceWeight:     types.WeightMidInfluence,
+		AdcInfluenceWeight:     types.WeightAdcInfluence,
+		SupportInfluenceWeight: types.WeightSupportInfluence,
 	}
 	if err := newCustomGameConfigurationDAO.Upsert(db.Root); err != nil {
 		log.Error(err)
@@ -389,11 +390,11 @@ func ArrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
-	if req.TargetPosition != service.PositionTop &&
-		req.TargetPosition != service.PositionJungle &&
-		req.TargetPosition != service.PositionMid &&
-		req.TargetPosition != service.PositionAdc &&
-		req.TargetPosition != service.PositionSupport {
+	if req.TargetPosition != types.PositionTop &&
+		req.TargetPosition != types.PositionJungle &&
+		req.TargetPosition != types.PositionMid &&
+		req.TargetPosition != types.PositionAdc &&
+		req.TargetPosition != types.PositionSupport {
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid target position")
 		return
 	}
@@ -617,15 +618,15 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 	}
 
 	// update candidate
-	if req.FavorPosition == service.PositionTop {
+	if req.FavorPosition == types.PositionTop {
 		candidateDAO.FlavorTop = *req.Strength
-	} else if req.FavorPosition == service.PositionJungle {
+	} else if req.FavorPosition == types.PositionJungle {
 		candidateDAO.FlavorJungle = *req.Strength
-	} else if req.FavorPosition == service.PositionMid {
+	} else if req.FavorPosition == types.PositionMid {
 		candidateDAO.FlavorMid = *req.Strength
-	} else if req.FavorPosition == service.PositionAdc {
+	} else if req.FavorPosition == types.PositionAdc {
 		candidateDAO.FlavorAdc = *req.Strength
-	} else if req.FavorPosition == service.PositionSupport {
+	} else if req.FavorPosition == types.PositionSupport {
 		candidateDAO.FlavorSupport = *req.Strength
 	} else {
 		_ = tx.Rollback()

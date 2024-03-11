@@ -9,6 +9,7 @@ import (
 	"team.gg-server/models"
 	"team.gg-server/service"
 	"team.gg-server/third_party/riot/api"
+	"team.gg-server/types"
 	"team.gg-server/util"
 	"time"
 )
@@ -107,14 +108,14 @@ func GetSummonerInfo(c *gin.Context) {
 		return
 	}
 
-	soloRankVO, err := service.GetSummonerRankVO(summonerDAO.Puuid, service.RankTypeSolo)
+	soloRankVO, err := service.GetSummonerRankVO(summonerDAO.Puuid, types.RankTypeSolo)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	flexRankVO, err := service.GetSummonerRankVO(summonerDAO.Puuid, service.RankTypeFlex)
+	flexRankVO, err := service.GetSummonerRankVO(summonerDAO.Puuid, types.RankTypeFlex)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -128,7 +129,7 @@ func GetSummonerInfo(c *gin.Context) {
 		return
 	}
 
-	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs_byQueueId(summonerDAO.Puuid, service.QueueTypeAll, service.GetInitialMatchCount())
+	matchesVOs, err := service.GetSummonerRecentMatchSummaryVOs_byQueueId(summonerDAO.Puuid, types.QueueTypeAll, service.GetInitialMatchCount())
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -195,7 +196,7 @@ func GetMatches(c *gin.Context) {
 
 	var queueType int
 	if req.QueueId == nil {
-		queueType = service.QueueTypeAll
+		queueType = types.QueueTypeAll
 	} else {
 		queueType = *req.QueueId
 	}
@@ -299,7 +300,7 @@ func LoadMatches(c *gin.Context) {
 
 	var queueId int
 	if req.QueueId == nil {
-		queueId = service.QueueTypeAll
+		queueId = types.QueueTypeAll
 	} else {
 		queueId = *req.QueueId
 	}

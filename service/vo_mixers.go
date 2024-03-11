@@ -21,7 +21,7 @@ func SummonerSummaryMixer(d models.SummonerDAO) SummonerSummaryVO {
 	}
 }
 
-func SummonerRankingMixer(d SummonerRankingMXDAO) SummonerRankingVO {
+func SummonerRankingMixer(d mixed.SummonerRankingMXDAO) SummonerRankingVO {
 	return SummonerRankingVO{
 		RatingPoints: d.RatingPoints,
 		Ranking:      d.Ranking,

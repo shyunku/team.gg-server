@@ -6,6 +6,7 @@ import (
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/third_party/riot/api"
+	"team.gg-server/types"
 	"time"
 )
 
@@ -106,8 +107,8 @@ func (de *DataExplorer) fetchNewSummoner() (bool, error) {
 
 	// get summoner recent matches
 	if err := RenewSummonerMatches(tx, summonerDAO.Puuid, &api.MatchIdsReqOption{
-		QueueId: QueueTypeAll,
-		Count:   DataExplorerLoadMatchesCount,
+		QueueId: types.QueueTypeAll,
+		Count:   types.DataExplorerLoadMatchesCount,
 	}); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()

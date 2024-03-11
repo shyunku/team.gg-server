@@ -60,6 +60,18 @@ func main() {
 		os.Exit(-1)
 	}
 
+	// Init Root database
+	var err error
+	log.Info("Initializing database...")
+	if db.Root, err = db.Initiate(service.RootDatabaseInitializer); err != nil {
+		log.Error(err)
+		os.Exit(-4)
+	}
+	if service.StatisticsDB, err = db.Initiate(nil); err != nil {
+		log.Error(err)
+		os.Exit(-5)
+	}
+
 	// preload
 	if err := core.Preload(); err != nil {
 		log.Error(err)
@@ -77,18 +89,6 @@ func main() {
 		log.Debug("Running in debug mode...")
 	} else {
 		log.Info("Running in production mode...")
-	}
-
-	// Init Root database
-	var err error
-	log.Info("Initializing database...")
-	if db.Root, err = db.Initiate(service.RootDatabaseInitializer); err != nil {
-		log.Error(err)
-		os.Exit(-4)
-	}
-	if service.StatisticsDB, err = db.Initiate(nil); err != nil {
-		log.Error(err)
-		os.Exit(-5)
 	}
 
 	// Init in-memory database
@@ -111,9 +111,14 @@ func main() {
 	de := service.NewDataExplorer()
 	go de.Loop()
 
+	// initialize statistics repository
+	log.Info("Initializing statistics repository...")
+	service.InitializeStatisticRepos()
+
 	// start statistics repository loop
 	log.Info("Starting statistics repository loops...")
 	go service.ChampionStatisticsRepo.Loop()
+	go service.ChampionDetailStatisticsRepo.Loop()
 	go service.TierStatisticsRepo.Loop()
 	go service.MasteryStatisticsRepo.Loop()
 

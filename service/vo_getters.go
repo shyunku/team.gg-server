@@ -7,6 +7,7 @@ import (
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/models/mixed"
+	"team.gg-server/types"
 	"team.gg-server/util"
 )
 
@@ -55,7 +56,7 @@ func GetSummonerExtraVO(puuid string, soloRank *SummonerRankVO) (*SummonerExtraV
 		return nil, err
 	}
 
-	matchParticipantExtraMXDAOs, err := mixed.GetMatchParticipantExtraMXDAOs_byQueueId(puuid, QueueTypeAll, 30)
+	matchParticipantExtraMXDAOs, err := mixed.GetMatchParticipantExtraMXDAOs_byQueueId(puuid, types.QueueTypeAll, 30)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -106,7 +107,7 @@ func GetSummonerExtraVO(puuid string, soloRank *SummonerRankVO) (*SummonerExtraV
 }
 
 func getSummonerRankingVO(puuid string) (*SummonerRankingVO, error) {
-	summonerRankingMXDAO, err := GetSummonerSoloRankingMXDAO(puuid)
+	summonerRankingMXDAO, err := mixed.GetSummonerSoloRankingMXDAO(db.Root, puuid)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -163,7 +164,7 @@ func GetSummonerRecentMatchSummaryVOs_byQueueId(puuid string, queueId, count int
 	}
 	var matchDAOs []models.MatchDAO
 	var err error
-	if queueId == QueueTypeAll {
+	if queueId == types.QueueTypeAll {
 		matchDAOs, err = models.GetMatchDAOs_byPuuid(db.Root, puuid, count)
 	} else {
 		matchDAOs, err = models.GetMatchDAOs_byQueueId(db.Root, puuid, queueId, count)
@@ -179,7 +180,7 @@ func GetSummonerRecentMatchSummaryVOs_byQueueId(puuid string, queueId, count int
 func GetSummonerMatchSummaryVOs_byQueueId_before(puuid string, queueId int, before int64, count int) ([]MatchSummaryVO, error) {
 	var matchDAOs []models.MatchDAO
 	var err error
-	if queueId == QueueTypeAll {
+	if queueId == types.QueueTypeAll {
 		matchDAOs, err = models.GetMatchDAOs_byPuuid_before(db.Root, puuid, before, count)
 	} else {
 		matchDAOs, err = models.GetMatchDAOs_byQueueId_before(db.Root, puuid, queueId, before, count)
@@ -211,9 +212,9 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []models.MatchDAO) ([]Ma
 		team2Participants := make([]TeammateVO, 0)
 		for _, matchExtraDAO := range matchExtraMXDAOs {
 			var summonerRankVO *SummonerRankVO
-			queueType := RankTypeSolo
-			if matchDAO.QueueId == QueueTypeFlex {
-				queueType = RankTypeFlex
+			queueType := types.RankTypeSolo
+			if matchDAO.QueueId == types.QueueTypeFlex {
+				queueType = types.RankTypeFlex
 			}
 
 			summonerRankVO, err = GetSummonerRankVO(matchExtraDAO.Puuid, queueType)
@@ -234,9 +235,9 @@ func getSummonerMatchSummaryVOs(puuid string, matchDAOs []models.MatchDAO) ([]Ma
 			primaryPerkStyle := 0
 			subPerkStyle := 0
 			for _, perk := range perks {
-				if perk.Description == PerkStyleDescriptionTypePrimary {
+				if perk.Description == types.PerkStyleDescriptionTypePrimary {
 					primaryPerkStyle = perk.Style
-				} else if perk.Description == PerkStyleDescriptionTypeSub {
+				} else if perk.Description == types.PerkStyleDescriptionTypeSub {
 					subPerkStyle = perk.Style
 				}
 			}
@@ -324,7 +325,7 @@ func GetCustomGameCandidateVO(candidateDAO models.CustomGameCandidateDAO) (*Cust
 	summonerVO := SummonerSummaryMixer(*summonerDao)
 
 	var soloLeagueVO *SummonerRankVO
-	soloLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, candidateDAO.Puuid, RankTypeSolo)
+	soloLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, candidateDAO.Puuid, types.RankTypeSolo)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -338,7 +339,7 @@ func GetCustomGameCandidateVO(candidateDAO models.CustomGameCandidateDAO) (*Cust
 	}
 
 	var flexLeagueVO *SummonerRankVO
-	flexLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, candidateDAO.Puuid, RankTypeFlex)
+	flexLeagueDAO, exists, err := models.GetLeagueDAO(db.Root, candidateDAO.Puuid, types.RankTypeFlex)
 	if err != nil {
 		log.Error(err)
 		return nil, err

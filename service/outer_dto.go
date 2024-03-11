@@ -15,6 +15,13 @@ type DDragonSummonerJsonDto struct {
 	Data    map[string]SummonerSpellDataVO `json:"data"`
 }
 
+type DDragonItemJsonDto struct {
+	Type    string                `json:"type"`
+	Version string                `json:"version"`
+	Basic   interface{}           `json:"basic"`
+	Data    map[string]ItemDataVO `json:"data"`
+}
+
 type PerksInfoDto []PerkInfoVO
 
 type PerkStylesInfoDto struct {

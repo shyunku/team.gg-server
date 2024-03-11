@@ -300,6 +300,34 @@ type SummonerSpellDataVO struct {
 	Resource string `json:"resource,omitempty"`
 }
 
+type ItemDataVO struct {
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	Colloq       string    `json:"colloq"`
+	Plaintext    string    `json:"plaintext"`
+	From         *[]string `json:"from"`
+	RequiredAlly *string   `json:"requiredAlly"`
+	Image        struct {
+		Full   string `json:"full"`
+		Sprite string `json:"sprite"`
+		Group  string `json:"group"`
+		X      int    `json:"x"`
+		Y      int    `json:"y"`
+		W      int    `json:"w"`
+		H      int    `json:"h"`
+	} `json:"image"`
+	Gold struct {
+		Base        int  `json:"base"`
+		Purchasable bool `json:"purchasable"`
+		Total       int  `json:"total"`
+		Sell        int  `json:"sell"`
+	} `json:"gold"`
+	Tags  []string               `json:"tags"`
+	Maps  map[string]bool        `json:"maps"`
+	Stats map[string]interface{} `json:"stats"`
+	Depth *int                   `json:"depth"`
+}
+
 type PerkInfoVO struct {
 	Id                                  int         `json:"id"`
 	Name                                string      `json:"name"`

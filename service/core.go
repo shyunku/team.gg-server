@@ -13,6 +13,7 @@ import (
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
 	"team.gg-server/third_party/riot/api"
+	"team.gg-server/types"
 	"team.gg-server/util"
 	"time"
 )
@@ -238,9 +239,9 @@ func RenewSummonerMatchesIfNecessary(db db.Context, puuid string, matchIdList []
 			uncachedMatches = append(uncachedMatches, *result.Result)
 		}
 
-		if core.DebugOnProd {
-			log.Debugf("Fetched %d uncached matches in %s", len(uncachedMatchIds), timer.GetDurationString())
-		}
+		//if core.DebugOnProd {
+		//	log.Debugf("Fetched %d uncached matches in %s", len(uncachedMatchIds), timer.GetDurationString())
+		//}
 
 		for _, match := range uncachedMatches {
 			if err := saveMatchToLocalDB(db, puuid, match); err != nil {
@@ -769,7 +770,7 @@ func calculateCustomGameConfigFairness(
 		//log.Debugf("team %d - %s: %s", participant.Team, participant.Position, participant.Summary.GameName)
 		var score float64 = 0
 		switch participant.Position {
-		case PositionTop:
+		case types.PositionTop:
 			lineSatisfaction += favorWeight(participant.PositionFavor.Top)
 			score = favorWeight(participant.PositionFavor.Top) * float64(participant.GetRepresentativeRatingPoint()) * weights.TopInfluence
 			if participant.Team == 1 {
@@ -777,7 +778,7 @@ func calculateCustomGameConfigFairness(
 			} else {
 				team2TopScore = score
 			}
-		case PositionJungle:
+		case types.PositionJungle:
 			lineSatisfaction += favorWeight(participant.PositionFavor.Jungle)
 			score = favorWeight(participant.PositionFavor.Jungle) * float64(participant.GetRepresentativeRatingPoint()) * weights.JungleInfluence
 			if participant.Team == 1 {
@@ -785,7 +786,7 @@ func calculateCustomGameConfigFairness(
 			} else {
 				team2JungleScore = score
 			}
-		case PositionMid:
+		case types.PositionMid:
 			lineSatisfaction += favorWeight(participant.PositionFavor.Mid)
 			score = favorWeight(participant.PositionFavor.Mid) * float64(participant.GetRepresentativeRatingPoint()) * weights.MidInfluence
 			if participant.Team == 1 {
@@ -793,7 +794,7 @@ func calculateCustomGameConfigFairness(
 			} else {
 				team2MidScore = score
 			}
-		case PositionAdc:
+		case types.PositionAdc:
 			lineSatisfaction += favorWeight(participant.PositionFavor.Adc)
 			score = favorWeight(participant.PositionFavor.Adc) * float64(participant.GetRepresentativeRatingPoint()) * weights.AdcInfluence
 			if participant.Team == 1 {
@@ -801,7 +802,7 @@ func calculateCustomGameConfigFairness(
 			} else {
 				team2AdcScore = score
 			}
-		case PositionSupport:
+		case types.PositionSupport:
 			lineSatisfaction += favorWeight(participant.PositionFavor.Support)
 			score = favorWeight(participant.PositionFavor.Support) * float64(participant.GetRepresentativeRatingPoint()) * weights.SupportInfluence
 			if participant.Team == 1 {

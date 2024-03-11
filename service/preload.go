@@ -14,7 +14,9 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"team.gg-server/core"
+	"team.gg-server/libs/db"
 	"team.gg-server/libs/http"
 	"team.gg-server/util"
 )
@@ -27,14 +29,13 @@ var (
 
 	Champions      = make(map[string]ChampionDataVO)      // key: champion key
 	SummonerSpells = make(map[string]SummonerSpellDataVO) // key: summoner spell key
+	Items          = make(map[int]ItemDataVO)             // key: item id
 	Perks          = make(map[int]PerkInfoVO)             // key: perk id
 	PerkStyles     = make(map[int]PerkStyleInfoVO)        // key: perk style id
 
 	RootDatabaseInitializer = func(db *sqlx.DB) error {
 		// find static data tables
-		var (
-			staticTierRankTable interface{}
-		)
+		var staticTierRankTable interface{}
 
 		if err := db.Get(&staticTierRankTable, "SELECT 1 FROM information_schema.tables WHERE table_name = 'static_tier_ranks' LIMIT 1"); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -182,6 +183,16 @@ func Preload() error {
 
 	// load summoner spell data
 	if err := LoadSummonerSpellsData(); err != nil {
+		return err
+	}
+
+	// load items data
+	if err := LoadItemsData(); err != nil {
+		return err
+	}
+
+	// save items data to db
+	if err := SaveItemsDataToDB(); err != nil {
 		return err
 	}
 
@@ -425,6 +436,129 @@ func LoadSummonerSpellsData() error {
 	}
 
 	log.Debugf("%d summoner spells loaded", len(SummonerSpells))
+	return nil
+}
+
+func LoadItemsData() error {
+	// load items
+	var ItemsDto DDragonItemJsonDto
+	if err := LoadDDragonKorFile(&ItemsDto, "/item.json"); err != nil {
+		return err
+	}
+
+	// save to memory
+	Items = map[int]ItemDataVO{}
+	for id, item := range ItemsDto.Data {
+		itemId, err := strconv.Atoi(id)
+		if err != nil {
+			return err
+		}
+		Items[itemId] = item
+	}
+
+	log.Debugf("%d items loaded", len(Items))
+	return nil
+}
+
+func SaveItemsDataToDB() error {
+	// upsert db: items, item_tags
+	// find static data tables
+	var (
+		itemsTable    interface{}
+		itemTagsTable interface{}
+	)
+
+	tx, err := db.Root.BeginTxx(context.Background(), nil)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	if err := tx.Get(&itemsTable, "SELECT 1 FROM information_schema.tables WHERE table_name = 'static_items' LIMIT 1"); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// create static tier ranks table
+			if _, err := tx.Exec(`
+				CREATE TABLE static_items (
+					id INT PRIMARY KEY,
+					name VARCHAR(255) NOT NULL,
+					description TEXT NOT NULL,
+					plaintext TEXT NOT NULL,
+					required_ally VARCHAR(255) NULL,
+					depth INT NULL,
+					gold_base INT NOT NULL,
+					gold_purchasable TINYINT NOT NULL,
+					gold_total INT NOT NULL,
+					gold_sell INT NOT NULL,
+					INDEX (name),
+					INDEX (depth DESC),
+					INDEX (gold_total DESC)
+				)
+			`); err != nil {
+				log.Error(err)
+				_ = tx.Rollback()
+				return err
+			}
+		} else {
+			log.Error(err)
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	if err := tx.Get(&itemTagsTable, "SELECT 1 FROM information_schema.tables WHERE table_name = 'static_item_tags' LIMIT 1"); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// create static tier ranks table
+			if _, err := tx.Exec(`
+				CREATE TABLE static_item_tags (
+					item_id INT NOT NULL,
+					tag VARCHAR(100) NOT NULL,
+					PRIMARY KEY (item_id, tag),
+					FOREIGN KEY (item_id) REFERENCES static_items(id),
+					INDEX (tag)
+				)
+			`); err != nil {
+				log.Error(err)
+				_ = tx.Rollback()
+				return err
+			}
+		} else {
+			log.Error(err)
+			_ = tx.Rollback()
+			return err
+		}
+	}
+
+	// upsert items
+	for id, item := range Items {
+		if _, err := tx.Exec(`
+			INSERT INTO static_items (id, name, description, plaintext, required_ally, depth, gold_base, gold_purchasable, gold_total, gold_sell) 
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE name = ?, description = ?, plaintext = ?, required_ally = ?, depth = ?,
+			                        gold_base = ?, gold_purchasable = ?, gold_total = ?, gold_sell = ?
+		`, id, item.Name, item.Description, item.Plaintext, item.RequiredAlly, item.Depth, item.Gold.Base, item.Gold.Purchasable, item.Gold.Total, item.Gold.Sell,
+			item.Name, item.Description, item.Plaintext, item.RequiredAlly, item.Depth, item.Gold.Base, item.Gold.Purchasable, item.Gold.Total, item.Gold.Sell,
+		); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			return err
+		}
+
+		// upsert item tags
+		for _, tag := range item.Tags {
+			if _, err := tx.Exec(`
+				INSERT INTO static_item_tags (item_id, tag) VALUES (?, ?) ON DUPLICATE KEY UPDATE tag = VALUES(tag)
+			`, id, tag); err != nil {
+				log.Error(err)
+				_ = tx.Rollback()
+				return err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		return err
+	}
+
 	return nil
 }
 
