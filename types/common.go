@@ -65,3 +65,101 @@ const (
 	MatchDecoTypeMostWardKilled     = "MOST_WARD_KILLED"
 	MatchDecoTypeHighestVisionScore = "HIGHEST_VISION_SCORE"
 )
+
+const (
+	ItemTagAbilityHaste      = "AbilityHaste"
+	ItemTagActive            = "Active"
+	ItemTagArmor             = "Armor"
+	ItemTagArmorPenetration  = "ArmorPenetration"
+	ItemTagAttackSpeed       = "AttackSpeed"
+	ItemTagAura              = "Aura"
+	ItemTagBoots             = "Boots"
+	ItemTagConsumable        = "Consumable"
+	ItemTagCooldownReduction = "CooldownReduction"
+	ItemTagCriticalStrike    = "CriticalStrike"
+	ItemTagDamage            = "Damage"
+	ItemTagGoldPer           = "GoldPer"
+	ItemTagHealth            = "Health"
+	ItemTagHealthRegen       = "HealthRegen"
+	ItemTagJungle            = "Jungle"
+	ItemTagLane              = "Lane"
+	ItemTagLifeSteal         = "LifeSteal"
+	ItemTagMagicPenetration  = "MagicPenetration"
+	ItemTagMagicResist       = "MagicResist"
+	ItemTagMana              = "Mana"
+	ItemTagManaRegen         = "ManaRegen"
+	ItemTagNonbootsMovement  = "NonbootsMovement"
+	ItemTagOnHit             = "OnHit"
+	ItemTagSlow              = "Slow"
+	ItemTagSpellBlock        = "SpellBlock"
+	ItemTagSpellDamage       = "SpellDamage"
+	ItemTagSpellVamp         = "SpellVamp"
+	ItemTagStealth           = "Stealth"
+	ItemTagTenacity          = "Tenacity"
+	ItemTagTrinket           = "Trinket"
+	ItemTagVision            = "Vision"
+
+	ItemCategoryTanker           = "Armor" // 방어력/마방
+	ItemCategoryArmorPenetration = "ArmorPenetration"
+	ItemCategoryAttackSpeed      = "AttackSpeed"
+	ItemCategoryCriticalStrike   = "CriticalStrike"
+	ItemCategoryAD               = "AD"
+	ItemCategoryAP               = "AP"
+	ItemCategoryGoldSupply       = "GoldSupply"
+	ItemCategoryHealth           = "Health"
+	ItemCategoryHealthRegen      = "HealthRegen"
+	ItemCategoryLifeSteal        = "LifeSteal" // AD/AP 피흡
+	ItemCategoryMagicPenetration = "MagicPenetration"
+	ItemCategoryMana             = "Mana"
+	ItemCategoryManaRegen        = "ManaRegen"
+	ItemCategoryMoveSpeed        = "MoveSpeed"
+	ItemCategoryOnHit            = "OnHit"
+	ItemCategorySlow             = "Slow"
+	ItemCategorySpellBlock       = "SpellBlock"
+	ItemCategoryStealth          = "Stealth" // deprecated
+	ItemCategoryTenacity         = "Tenacity"
+)
+
+var (
+	itemCategories = map[string]string{
+		ItemTagAbilityHaste:      "",
+		ItemTagActive:            "",
+		ItemTagArmor:             ItemCategoryTanker,
+		ItemTagArmorPenetration:  ItemCategoryArmorPenetration,
+		ItemTagAttackSpeed:       ItemCategoryAttackSpeed,
+		ItemTagAura:              "",
+		ItemTagBoots:             "",
+		ItemTagConsumable:        "",
+		ItemTagCooldownReduction: "",
+		ItemTagCriticalStrike:    ItemCategoryCriticalStrike,
+		ItemTagDamage:            "",
+		ItemTagGoldPer:           ItemCategoryGoldSupply,
+		ItemTagHealth:            ItemCategoryHealth,
+		ItemTagHealthRegen:       ItemCategoryHealthRegen,
+		ItemTagJungle:            "",
+		ItemTagLane:              "",
+		ItemTagLifeSteal:         ItemCategoryLifeSteal,
+		ItemTagMagicPenetration:  ItemCategoryMagicPenetration,
+		ItemTagMagicResist:       ItemCategoryTanker,
+		ItemTagMana:              ItemCategoryMana,
+		ItemTagManaRegen:         ItemCategoryManaRegen,
+		ItemTagNonbootsMovement:  ItemCategoryMoveSpeed,
+		ItemTagOnHit:             ItemCategoryOnHit,
+		ItemTagSlow:              ItemCategorySlow,
+		ItemTagSpellBlock:        ItemCategorySpellBlock,
+		ItemTagSpellDamage:       "",
+		ItemTagSpellVamp:         ItemCategoryLifeSteal,
+		ItemTagStealth:           ItemCategoryStealth,
+		ItemTagTenacity:          ItemCategoryTenacity,
+		ItemTagTrinket:           "",
+		ItemTagVision:            "",
+	}
+	GetItemCategories = func(tag string) *string {
+		if category, ok := itemCategories[tag]; ok {
+			if category != "" {
+				return &category
+			}
+		}
+		return nil
+	}
+)

@@ -224,8 +224,8 @@ type ChampionDataVO struct {
 	Id      string `json:"id"`
 	Key     string `json:"key"`
 	Name    string `json:"name"`
-	Title   string `json:"title"`
-	Blurb   string `json:"blurb"`
+	Title   string `json:"title"` // 챔피언 컨셉 (ex. 아트록스: 다르킨의 검)
+	Blurb   string `json:"blurb"` // 챔피언 스토리
 	Info    struct {
 		Attack     int `json:"attack"`
 		Defense    int `json:"defense"`

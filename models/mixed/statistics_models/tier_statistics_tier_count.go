@@ -1,4 +1,4 @@
-package statistics
+package statistics_models
 
 import (
 	"database/sql"

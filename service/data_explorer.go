@@ -41,7 +41,9 @@ func (de *DataExplorer) finalizeExploration(meaningful, success bool) {
 			de.cacheHit++
 		}
 	}
-	log.Debugf("DataExplorer: explored %d/%d", de.cacheHit, de.exploreCaches)
+	if de.exploreCaches%30 == 0 {
+		log.Debugf("DataExplorer: explored %d/%d", de.cacheHit, de.exploreCaches)
+	}
 }
 
 func (de *DataExplorer) Explore() bool {

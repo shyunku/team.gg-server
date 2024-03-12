@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 func CheckEnvironmentVariables(checkKeys []string) error {
@@ -129,4 +130,20 @@ func Factorial(n int64) int64 {
 
 func Permutation(n int64, r int64) int64 {
 	return Factorial(n) / Factorial(n-r)
+}
+
+func MemorySizeOfArray[T any](obj []T) string {
+	if len(obj) == 0 {
+		return "0 bytes"
+	}
+	size := float64(unsafe.Sizeof(obj) * unsafe.Sizeof(obj[0]) * uintptr(len(obj)))
+	if size < 1024 {
+		return fmt.Sprintf("%.f bytes", size)
+	} else if size < 1024*1024 {
+		return fmt.Sprintf("%.3f KB", size/1024)
+	} else if size < 1024*1024*1024 {
+		return fmt.Sprintf("%.3f MB", size/1024/1024)
+	} else {
+		return fmt.Sprintf("%.3f GB", size/1024/1024/1024)
+	}
 }

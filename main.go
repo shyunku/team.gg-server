@@ -11,6 +11,7 @@ import (
 	"team.gg-server/libs/crypto"
 	"team.gg-server/libs/db"
 	"team.gg-server/service"
+	"team.gg-server/service/statistics"
 	"team.gg-server/third_party/riot"
 	"team.gg-server/util"
 	"time"
@@ -67,7 +68,7 @@ func main() {
 		log.Error(err)
 		os.Exit(-4)
 	}
-	if service.StatisticsDB, err = db.Initiate(nil); err != nil {
+	if statistics.StatisticsDB, err = db.Initiate(nil); err != nil {
 		log.Error(err)
 		os.Exit(-5)
 	}
@@ -111,16 +112,16 @@ func main() {
 	de := service.NewDataExplorer()
 	go de.Loop()
 
-	// initialize statistics repository
-	log.Info("Initializing statistics repository...")
-	service.InitializeStatisticRepos()
+	// initialize statistics_models repository
+	log.Info("Initializing statistics_models repository...")
+	statistics.InitializeStatisticRepos()
 
-	// start statistics repository loop
-	log.Info("Starting statistics repository loops...")
-	go service.ChampionStatisticsRepo.Loop()
-	go service.ChampionDetailStatisticsRepo.Loop()
-	go service.TierStatisticsRepo.Loop()
-	go service.MasteryStatisticsRepo.Loop()
+	// start statistics_models repository loop
+	log.Info("Starting statistics_models repository loops...")
+	go statistics.ChampionStatisticsRepo.Loop()
+	go statistics.ChampionDetailStatisticsRepo.Loop()
+	go statistics.TierStatisticsRepo.Loop()
+	go statistics.MasteryStatisticsRepo.Loop()
 
 	// Run web server with gin
 	controllers.RunGin()

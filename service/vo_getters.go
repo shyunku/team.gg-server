@@ -76,7 +76,7 @@ func GetSummonerExtraVO(puuid string, soloRank *SummonerRankVO) (*SummonerExtraV
 		ggScoreAvg = ggScoreSum / float64(validGGScores)
 	}
 
-	// TODO :: add some extra fun things (statistics: tags)
+	// TODO :: add some extra fun things (statistics_models: tags)
 
 	var predictedRankVO *SummonerRankVO
 	predictedMMR := 0.0

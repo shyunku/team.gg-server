@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
-	"team.gg-server/service"
+	"team.gg-server/service/statistics"
 	"team.gg-server/util"
 )
 
@@ -18,7 +18,7 @@ func UseStatisticsRouter(r *gin.RouterGroup) {
 }
 
 func GetChampionStatistics(c *gin.Context) {
-	statistics, err := service.ChampionStatisticsRepo.Load()
+	statistics, err := statistics.ChampionStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -36,7 +36,7 @@ func GetChampionStatisticsDetail(c *gin.Context) {
 		return
 	}
 
-	statistics, err := service.ChampionDetailStatisticsRepo.Load()
+	statistics, err := statistics.ChampionDetailStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -53,7 +53,7 @@ func GetChampionStatisticsDetail(c *gin.Context) {
 }
 
 func GetTierStatistics(c *gin.Context) {
-	statistics, err := service.TierStatisticsRepo.Load()
+	statistics, err := statistics.TierStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -64,7 +64,7 @@ func GetTierStatistics(c *gin.Context) {
 }
 
 func GetMasteryStatistics(c *gin.Context) {
-	statistics, err := service.MasteryStatisticsRepo.Load()
+	statistics, err := statistics.MasteryStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
