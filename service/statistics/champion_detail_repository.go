@@ -19,13 +19,23 @@ import (
 
 /* ----------------------- Champion Detail statistics_models ----------------------- */
 
+type ChampionPositionStatistics struct {
+	PickCount int `json:"pickCount"`
+	WinCount  int `json:"winCount"`
+}
+
 type MetaPick struct {
 	Id             string
+	Summoner1Id    int
+	Summoner2Id    int
 	PrimaryStyleId int
 	SubStyleId     int
 	Item0          int
 	Item1          int
 	Item2          int
+	Item3          *int
+	Item4          *int
+	Item5          *int
 	Wins           int
 	Total          int
 	WinRate        float64
@@ -33,16 +43,40 @@ type MetaPick struct {
 	MetaRank       int
 	MajorTag       string
 	MinorTag       *string
+
+	StartItems []int
+	BasicItems []int
+	SubItems   []int
 }
 
 func (m *MetaPick) toRealMeta() ChampionDetailStatisticsMeta {
+	items := []*int{
+		&m.Item0,
+		&m.Item1,
+		&m.Item2,
+		m.Item3,
+		m.Item4,
+		m.Item5,
+	}
+	validItems := make([]int, 0)
+	for _, item := range items {
+		if item != nil {
+			validItems = append(validItems, *item)
+		}
+	}
+	uuid := uuid2.New()
 	return ChampionDetailStatisticsMeta{
-		MetaName:         fmt.Sprintf("meta-%s-%d", m.MajorTag, m.MetaRank),
+		MetaKey:          fmt.Sprintf("meta-%s-%s", m.MajorTag, uuid.String()),
 		MajorTag:         m.MajorTag,
 		MinorTag:         m.MinorTag,
+		Summoner1Id:      m.Summoner1Id,
+		Summoner2Id:      m.Summoner2Id,
 		MajorPerkStyleId: m.PrimaryStyleId,
 		MinorPerkStyleId: m.SubStyleId,
-		ItemTree:         []int{m.Item0, m.Item1, m.Item2},
+		StartItemTree:    m.StartItems,
+		BasicItemTree:    m.BasicItems,
+		ItemTree:         validItems,
+		SubItemTree:      m.SubItems,
 		Count:            m.Total,
 		Win:              m.Wins,
 		PickRate:         m.PickRate,
@@ -62,6 +96,14 @@ func (mg *MetaGroup) getTotalWinRate() float64 {
 	return float64(totalWins) / float64(totalTotal)
 }
 
+func (mg *MetaGroup) getTotalPickCount() int {
+	totalPickCount := 0
+	for _, metaPick := range *mg {
+		totalPickCount += metaPick.Total
+	}
+	return totalPickCount
+}
+
 func (mg *MetaGroup) getTotalPickRate() float64 {
 	totalPickRate := 0.0
 	for _, metaPick := range *mg {
@@ -71,14 +113,20 @@ func (mg *MetaGroup) getTotalPickRate() float64 {
 }
 
 type ChampionDetailStatisticsMeta struct {
-	MetaName string `json:"metaName"`
-
+	MetaKey  string  `json:"metaKey"`
 	MajorTag string  `json:"majorTag"`
 	MinorTag *string `json:"minorTag"`
 
-	MajorPerkStyleId int   `json:"majorPerkStyleId"`
-	MinorPerkStyleId int   `json:"minorPerkStyleId"`
-	ItemTree         []int `json:"itemTree"` // must be sorted as descending order with gold
+	Summoner1Id int `json:"summoner1Id"`
+	Summoner2Id int `json:"summoner2Id"`
+
+	MajorPerkStyleId int `json:"majorPerkStyleId"`
+	MinorPerkStyleId int `json:"minorPerkStyleId"`
+
+	StartItemTree []int `json:"startItemTree"`
+	BasicItemTree []int `json:"basicItemTree"`
+	ItemTree      []int `json:"itemTree"`
+	SubItemTree   []int `json:"subItemTree"`
 
 	Count int `json:"count"`
 	Win   int `json:"win"`
@@ -91,6 +139,8 @@ type ChampionDetailStatisticsMetaTree struct {
 	MajorMetaPicks []ChampionDetailStatisticsMeta `json:"majorMetaPicks"`
 	MinorMetaPicks []ChampionDetailStatisticsMeta `json:"minorMetaPick"`
 	MetaPicks      []ChampionDetailStatisticsMeta `json:"metaPicks"`
+	PickCount      int                            `json:"pickCount"`
+	WinCount       int                            `json:"winCount"`
 }
 
 type ChampionDetailStatisticsPositionMetaTree struct {
@@ -129,11 +179,9 @@ type ChampionDetailStatisticsItem struct {
 	AvgBanRate  float64 `json:"avgBanRate"`
 	AvgWinRate  float64 `json:"avgWinRate"`
 
-	ExtraStats      ChampionDetailStatisticsExtraStats      `json:"extraStats"`
-	NormalizedStats ChampionDetailStatisticsNormalizedStats `json:"normalizedStats"`
-
-	TeamPosition string                                   `json:"teamPosition"`
-	MetaTree     ChampionDetailStatisticsPositionMetaTree `json:"metaTree"`
+	ExtraStats      ChampionDetailStatisticsExtraStats       `json:"extraStats"`
+	NormalizedStats ChampionDetailStatisticsNormalizedStats  `json:"normalizedStats"`
+	MetaTree        ChampionDetailStatisticsPositionMetaTree `json:"metaTree"`
 }
 
 type ChampionDetailStatistics struct {
@@ -180,24 +228,51 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 	timer.Start()
 
 	// collect data
+	championDetailStatisticsMXDAOmap := make(map[int]statistics_models.ChampionDetailStatisticMXDAO)
 	championDetailStatisticMXDAOs, err := statistics_models.GetChampionDetailStatisticMXDAOs(StatisticsDB)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	championDetailStatisticsMXDAOmap := make(map[int]statistics_models.ChampionDetailStatisticMXDAO)
 	for _, championDetailStatisticMXDAO := range championDetailStatisticMXDAOs {
 		championDetailStatisticsMXDAOmap[championDetailStatisticMXDAO.ChampionId] = championDetailStatisticMXDAO
 	}
 	log.Debugf("championDetailStatisticMXDAOs: %d", len(championDetailStatisticMXDAOs))
 
+	// collect champion pick count by team position
+	championPositionStatisticsMXDAOmap := make(map[int]map[string]ChampionPositionStatistics)
+	championPositionStatisticsMXDAOs, err := statistics_models.GetChampionPositionStatisticsMXDAOs(StatisticsDB)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	for _, championPositionStatisticsMXDAO := range championPositionStatisticsMXDAOs {
+		championId := championPositionStatisticsMXDAO.ChampionId
+		if _, exists := championPositionStatisticsMXDAOmap[championId]; !exists {
+			championPositionStatisticsMXDAOmap[championId] = make(map[string]ChampionPositionStatistics)
+		}
+		teamPosition := championPositionStatisticsMXDAO.TeamPosition
+		if teamPosition != types.TeamPositionTop &&
+			teamPosition != types.TeamPositionJungle &&
+			teamPosition != types.TeamPositionMid &&
+			teamPosition != types.TeamPositionAdc &&
+			teamPosition != types.TeamPositionSupport {
+			log.Warnf("team position not matched: %s", teamPosition)
+			continue
+		}
+		championPositionStatisticsMXDAOmap[championId][teamPosition] = ChampionPositionStatistics{
+			PickCount: championPositionStatisticsMXDAO.Total,
+			WinCount:  championPositionStatisticsMXDAO.Win,
+		}
+	}
+
 	// collect meta
+	championDetailStatisticsMetaMap := make(map[int][]statistics_models.ChampionDetailStatisticsMetaMXDAO)
 	championDetailStatisticsMetaMXDAOs, err := statistics_models.GetChampionDetailStatisticsMetaMXDAOs(StatisticsDB)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	championDetailStatisticsMetaMap := make(map[int][]statistics_models.ChampionDetailStatisticsMetaMXDAO)
 	for _, meta := range championDetailStatisticsMetaMXDAOs {
 		championId := meta.ChampionId
 		if _, exists := championDetailStatisticsMetaMap[championId]; !exists {
@@ -216,13 +291,19 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 			return nil, err
 		}
 
+		championPositionStatisticsMXDAO, exists := championPositionStatisticsMXDAOmap[championId]
+		if !exists {
+			log.Warnf("championId not found: %d", championId)
+			continue
+		}
+
 		metas, ok := championDetailStatisticsMetaMap[championId]
 		if !ok {
 			log.Warnf("championId not found: %d", championId)
 			continue
 		}
 
-		metaTree, err := cdsr.collectEachChampionMetas(metas)
+		metaTree, err := cdsr.collectEachChampionMetas(champion, metas, championPositionStatisticsMXDAO)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -298,13 +379,13 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 	return cdsr.Cache, nil
 }
 
-func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(championDetailStatisticsMetaMXDAOs []statistics_models.ChampionDetailStatisticsMetaMXDAO) (*ChampionDetailStatisticsPositionMetaTree, error) {
-	//championDetailStatisticsMetaMXDAOs, err := statistics_models.GetChampionDetailStatisticsMetaMXDAOs_byChampionId(StatisticsDB, championId)
-	//if err != nil {
-	//	log.Error(err)
-	//	return nil, err
-	//}
-
+func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
+	champion service.ChampionDataVO,
+	championDetailStatisticsMetaMXDAOs []statistics_models.ChampionDetailStatisticsMetaMXDAO,
+	countByPosition map[string]ChampionPositionStatistics,
+) (*ChampionDetailStatisticsPositionMetaTree, error) {
+	isAdType := champion.Info.Attack >= 5
+	isApType := champion.Info.Magic >= 5
 	metaTrees := &ChampionDetailStatisticsPositionMetaTree{
 		Top:     nil,
 		Jungle:  nil,
@@ -330,10 +411,134 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(champio
 	}
 
 	for teamPosition, metaMXDAOs := range metaMXDAOsByPosition {
+		pickCount, winCount := 0, 0
+		positionStatistics, ok := countByPosition[teamPosition]
+		if ok {
+			pickCount = positionStatistics.PickCount
+			winCount = positionStatistics.WinCount
+		} else {
+			pickCount = 0
+			winCount = 0
+		}
+
+		positionItems := make([]int, 0)
+		for _, metaMXDAO := range metaMXDAOs {
+			items := []*int{
+				&metaMXDAO.Item0Id,
+				&metaMXDAO.Item1Id,
+				&metaMXDAO.Item2Id,
+				metaMXDAO.Item3Id,
+				metaMXDAO.Item4Id,
+				metaMXDAO.Item5Id,
+			}
+			for _, item := range items {
+				if item != nil {
+					positionItems = append(positionItems, *item)
+				}
+			}
+		}
+		type PositionItemCount struct {
+			itemId int
+			count  int
+		}
+		positionItemCountMap := make(map[int]int)
+		for _, item := range positionItems {
+			if _, exists := positionItemCountMap[item]; !exists {
+				positionItemCountMap[item] = 0
+			}
+			positionItemCountMap[item]++
+		}
+		positionItemCounts := make([]PositionItemCount, 0)
+		for itemId, count := range positionItemCountMap {
+			positionItemCounts = append(positionItemCounts, PositionItemCount{itemId: itemId, count: count})
+		}
+		sort.SliceStable(positionItemCounts, func(i, j int) bool {
+			return positionItemCounts[i].count > positionItemCounts[j].count
+		})
+		positionItemTags := make(map[string]bool)
+		for _, itemCount := range positionItemCounts {
+			item, exists := service.Items[itemCount.itemId]
+			if !exists {
+				log.Errorf("item not found: %d", itemCount.itemId)
+				continue
+			}
+			for _, tag := range item.Tags {
+				positionItemTags[tag] = true
+			}
+		}
+		positionLowDepthItemRecommendations := make(map[int]service.ItemDataVO)
+		for itemId, item := range service.Items {
+			if !(item.Depth == nil &&
+				item.Gold.Purchasable &&
+				item.Gold.Total > 0 &&
+				item.RequiredAlly == nil &&
+				item.AvailableOnMapId(types.MapTypeSummonersRift)) {
+				continue
+			}
+			foundTags := 0
+			tagMap := make(map[string]bool)
+			for _, tag := range item.Tags {
+				if _, exists := positionItemTags[tag]; exists {
+					foundTags++
+				}
+				tagMap[tag] = true
+			}
+
+			hasTag := func(tag string) bool {
+				_, exists := tagMap[tag]
+				return exists
+			}
+
+			onlyForJungle, onlyForLane := hasTag(types.ItemTagJungle), hasTag(types.ItemTagLane)
+			onlyForAd := hasTag(types.ItemTagDamage) || hasTag(types.ItemTagCriticalStrike)
+			onlyForAp := hasTag(types.ItemTagSpellDamage) || hasTag(types.ItemTagSpellVamp)
+			forVision, _ := hasTag(types.ItemTagVision), hasTag(types.ItemTagGoldPer)
+			forConsumable := hasTag(types.ItemTagConsumable)
+
+			if onlyForJungle && onlyForLane {
+				onlyForJungle, onlyForLane = false, false
+			}
+			if onlyForAd && onlyForAp {
+				onlyForAd, onlyForAp = false, false
+			}
+
+			except := false
+			if (teamPosition == types.TeamPositionJungle && onlyForLane) || (teamPosition != types.TeamPositionJungle && onlyForJungle) {
+				except = true
+			}
+			if teamPosition != types.TeamPositionSupport && forVision && !forConsumable {
+				except = true
+			}
+			if isAdType != isApType {
+				// AD/AP 구분이 확실한 경우에만 필터링
+				if (isAdType && onlyForAp) || (isApType && onlyForAd) {
+					except = true
+				}
+			}
+
+			if foundTags > 2 || !except {
+				positionLowDepthItemRecommendations[itemId] = item
+			}
+		}
+
 		metaGroup := make(MetaGroup, 0)
 		for _, metaMXDAO := range metaMXDAOs {
+			items := []*int{
+				&metaMXDAO.Item0Id,
+				&metaMXDAO.Item1Id,
+				&metaMXDAO.Item2Id,
+				metaMXDAO.Item3Id,
+				metaMXDAO.Item4Id,
+				metaMXDAO.Item5Id,
+			}
+			validItems := make([]int, 0)
+			for _, item := range items {
+				if item != nil {
+					validItems = append(validItems, *item)
+				}
+			}
 			majorItems := make([]service.ItemDataVO, 0)
-			for _, itemId := range []int{metaMXDAO.Item0Id, metaMXDAO.Item1Id, metaMXDAO.Item2Id} {
+			for _, itemId := range validItems {
 				item, exists := service.Items[itemId]
 				if !exists {
 					log.Errorf("item not found: %d", itemId)
@@ -362,45 +567,116 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(champio
 				count    int
 			}
 			categoryCounts := make([]CategoryCount, 0)
+			maxCount := 0
 			for category, count := range tagCategories {
 				categoryCounts = append(categoryCounts, CategoryCount{category: category, count: count})
+				if count > maxCount {
+					maxCount = count
+				}
 			}
 
-			// sort categories by count (desc)
-			sort.SliceStable(categoryCounts, func(i, j int) bool {
-				if categoryCounts[i].count == categoryCounts[j].count {
-					return categoryCounts[i].category < categoryCounts[j].category
-				}
-				return categoryCounts[i].count > categoryCounts[j].count
-			})
-
-			// get major tag and minor tag
 			var majorTag string
 			var minorTag *string
-			if len(categoryCounts) > 0 {
-				majorTag = categoryCounts[0].category
-				if len(categoryCounts) > 1 {
-					minorTag = &categoryCounts[1].category
+			if maxCount > 1 {
+				// sort categories by count (desc)
+				sort.SliceStable(categoryCounts, func(i, j int) bool {
+					if categoryCounts[i].count == categoryCounts[j].count {
+						return categoryCounts[i].category < categoryCounts[j].category
+					}
+					return categoryCounts[i].count > categoryCounts[j].count
+				})
+
+				// get major tag and minor tag
+				if len(categoryCounts) > 0 {
+					majorTag = categoryCounts[0].category
+					if len(categoryCounts) > 1 {
+						minorTag = &categoryCounts[1].category
+					}
+				} else {
+					continue
 				}
 			} else {
-				continue
+				// set major tag as first category & minor tag as nil
+				if len(categoryCounts) > 0 {
+					majorTag = categoryCounts[0].category
+				} else {
+					continue
+				}
 			}
 
+			// gold sorter desc
+			descSorter := func(i, j int) bool {
+				itemI, existsI := service.Items[i]
+				itemJ, existsJ := service.Items[j]
+				if !existsI || !existsJ {
+					return false
+				}
+				return itemI.Gold.Total > itemJ.Gold.Total
+			}
+			ascSorter := func(i, j int) bool {
+				itemI, existsI := service.Items[i]
+				itemJ, existsJ := service.Items[j]
+				if !existsI || !existsJ {
+					return false
+				}
+				return itemI.Gold.Total < itemJ.Gold.Total
+			}
+
+			// collect start, basic items
+			startItems := make([]int, 0)
+			basicItems := make([]int, 0)
+			for itemId, item := range positionLowDepthItemRecommendations {
+				if item.Gold.Total <= 500 && item.Into == nil {
+					startItems = append(startItems, itemId)
+				} else {
+					basicItems = append(basicItems, itemId)
+				}
+			}
+			// collect sub items
+			subItems := make([]int, 0)
+			for _, itemCount := range positionItemCounts {
+				foundInThisMeta := false
+				for _, itemId := range validItems {
+					if itemId == itemCount.itemId {
+						foundInThisMeta = true
+						break
+					}
+				}
+				if !foundInThisMeta {
+					subItems = append(subItems, itemCount.itemId)
+				}
+			}
+			sort.SliceStable(startItems, descSorter)
+			sort.SliceStable(basicItems, ascSorter)
+			sort.SliceStable(subItems, descSorter)
+
 			uuid := uuid2.New()
+			pickRate := 0.0
+			if pickCount > 0 {
+				pickRate = float64(metaMXDAO.Total) / float64(pickCount)
+			}
 			metaPick := MetaPick{
 				Id:             uuid.String(),
+				Summoner1Id:    metaMXDAO.Summoner1Id,
+				Summoner2Id:    metaMXDAO.Summoner2Id,
 				PrimaryStyleId: metaMXDAO.PrimaryStyle,
 				SubStyleId:     metaMXDAO.SubStyle,
 				Item0:          metaMXDAO.Item0Id,
 				Item1:          metaMXDAO.Item1Id,
 				Item2:          metaMXDAO.Item2Id,
+				Item3:          metaMXDAO.Item3Id,
+				Item4:          metaMXDAO.Item4Id,
+				Item5:          metaMXDAO.Item5Id,
 				Wins:           metaMXDAO.Wins,
 				Total:          metaMXDAO.Total,
 				WinRate:        metaMXDAO.WinRate,
-				PickRate:       metaMXDAO.PickRate,
+				PickRate:       pickRate,
 				MetaRank:       metaMXDAO.MetaRank,
 				MajorTag:       majorTag,
 				MinorTag:       minorTag,
+				StartItems:     startItems,
+				BasicItems:     basicItems,
+				SubItems:       subItems,
 			}
 
 			metaGroup = append(metaGroup, metaPick)
@@ -419,7 +695,7 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(champio
 			conceptGroups[concept] = append(conceptGroups[concept], metaPick)
 		}
 
-		// pick popular 3 concept group
+		// pick popular concept groups
 		concepts := make([]string, 0)
 		for concept, _ := range conceptGroups {
 			concepts = append(concepts, concept)
@@ -428,10 +704,10 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(champio
 		sort.SliceStable(concepts, func(i, j int) bool {
 			conceptI, conceptJ := concepts[i], concepts[j]
 			groupI, groupJ := conceptGroups[conceptI], conceptGroups[conceptJ]
-			pickRateI, pickRateJ := groupI.getTotalPickRate(), groupJ.getTotalPickRate()
+			pickCountI, pickCountJ := groupI.getTotalPickCount(), groupJ.getTotalPickCount()
 			winRateI, winRateJ := groupI.getTotalWinRate(), groupJ.getTotalWinRate()
-			if pickRateI != pickRateJ {
-				return pickRateI > pickRateJ
+			if pickCountI != pickCountJ {
+				return pickCountI > pickCountJ
 			}
 			return winRateI > winRateJ
 		})
@@ -451,12 +727,12 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(champio
 		sort.SliceStable(nonPopularConcepts, func(i, j int) bool {
 			conceptI, conceptJ := concepts[i], concepts[j]
 			groupI, groupJ := conceptGroups[conceptI], conceptGroups[conceptJ]
-			pickRateI, pickRateJ := groupI.getTotalPickRate(), groupJ.getTotalPickRate()
+			pickCountI, pickCountJ := groupI.getTotalPickCount(), groupJ.getTotalPickCount()
 			winRateI, winRateJ := groupI.getTotalWinRate(), groupJ.getTotalWinRate()
 			if winRateI != winRateJ {
 				return winRateI > winRateJ
 			}
-			return pickRateI > pickRateJ
+			return pickCountI > pickCountJ
 		})
 		if len(nonPopularConcepts) > 0 {
 			minorConcept = &nonPopularConcepts[0]
@@ -505,6 +781,8 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(champio
 			MajorMetaPicks: make([]ChampionDetailStatisticsMeta, 0),
 			MinorMetaPicks: make([]ChampionDetailStatisticsMeta, 0),
 			MetaPicks:      make([]ChampionDetailStatisticsMeta, 0),
+			PickCount:      pickCount,
+			WinCount:       winCount,
 		}
 		for _, metaPick := range majorMetaPicks {
 			metaTree.MajorMetaPicks = append(metaTree.MajorMetaPicks, metaPick.toRealMeta())

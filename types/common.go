@@ -52,6 +52,9 @@ const (
 	QueueTypeUrf         = 900 // 우르프
 	QueueTypePoro        = 920 // 포로왕?
 
+	MapTypeSummonersRift = 11
+	MapTypeHowlingAbyss  = 12
+
 	MatchDecoTypeFirstBloodKill     = "FIRST_BLOOD"
 	MatchDecoTypeHighestDamage      = "HIGHEST_DAMAGE"
 	MatchDecoTypeHighestDamageTaken = "HIGHEST_DAMAGE_TAKEN"
@@ -64,6 +67,12 @@ const (
 	MatchDecoTypeMostWardPlaced     = "MOST_WARD_PLACED"
 	MatchDecoTypeMostWardKilled     = "MOST_WARD_KILLED"
 	MatchDecoTypeHighestVisionScore = "HIGHEST_VISION_SCORE"
+)
+
+const (
+	ChampionTypeAttack  = "attack"
+	ChampionTypeDefense = "defense"
+	ChampionTypeMagic   = "magic"
 )
 
 const (

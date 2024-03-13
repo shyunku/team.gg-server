@@ -1,6 +1,9 @@
 package service
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 /* ------------------------ Service VOs ------------------------ */
 
@@ -305,6 +308,7 @@ type ItemDataVO struct {
 	Description  string    `json:"description"`
 	Colloq       string    `json:"colloq"`
 	Plaintext    string    `json:"plaintext"`
+	Into         *[]string `json:"into"`
 	From         *[]string `json:"from"`
 	RequiredAlly *string   `json:"requiredAlly"`
 	Image        struct {
@@ -326,6 +330,11 @@ type ItemDataVO struct {
 	Maps  map[string]bool        `json:"maps"`
 	Stats map[string]interface{} `json:"stats"`
 	Depth *int                   `json:"depth"`
+}
+
+func (idv *ItemDataVO) AvailableOnMapId(mapId int) bool {
+	available, exists := idv.Maps[strconv.Itoa(mapId)]
+	return exists && available
 }
 
 type PerkInfoVO struct {
