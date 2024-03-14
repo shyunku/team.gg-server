@@ -11,7 +11,6 @@ const StatisticsDataPath = "datafiles/statistics"
 
 var (
 	StatisticsDB                 *sqlx.DB                            = nil
-	ChampionStatisticsRepo       *ChampionStatisticsRepository       = nil
 	ChampionDetailStatisticsRepo *ChampionDetailStatisticsRepository = nil
 	TierStatisticsRepo           *TierStatisticsRepository           = nil
 	MasteryStatisticsRepo        *MasteryStatisticsRepository        = nil
@@ -27,7 +26,6 @@ type Statistics[T any] interface {
 }
 
 func InitializeStatisticRepos() {
-	ChampionStatisticsRepo = NewChampionStatisticsRepository()
 	ChampionDetailStatisticsRepo = NewChampionDetailStatisticsRepository()
 	TierStatisticsRepo = NewTierStatisticsRepository()
 	MasteryStatisticsRepo = NewMasteryStatisticsRepository()

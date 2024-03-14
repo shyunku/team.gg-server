@@ -121,17 +121,23 @@ func GetPerkStyleIcon(c *gin.Context) {
 		return
 	}
 
-	perkStyle, ok := service.PerkStyles[req.Id]
-	if !ok {
+	perkStyle, ok1 := service.PerkStyles[req.Id]
+	perk, ok2 := service.Perks[req.Id]
+	if !ok1 && !ok2 {
 		log.Debug(service.Perks)
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid perk id")
 		return
 	}
 
-	perkImgPathRaw := perkStyle.IconPath
+	var perkImgPathRaw string
+	if ok1 {
+		perkImgPathRaw = perkStyle.IconPath
+	} else {
+		perkImgPathRaw = perk.IconPath
+	}
+
 	re := regexp.MustCompile(`(?m)/perk-images/(.*)`)
 	perkImgPath := re.FindStringSubmatch(perkImgPathRaw)[1]
-
 	path := "https://ddragon.leagueoflegends.com/cdn/img/perk-images/" + perkImgPath
 	c.Redirect(http.StatusMovedPermanently, path)
 }

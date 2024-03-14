@@ -81,6 +81,9 @@ func Initiate(initializer DatabaseInitializer) (db *sqlx.DB, err error) {
 			return nil, errors.New("failed to initialize database: " + err.Error())
 		}
 	}
+	db.SetConnMaxIdleTime(0)
+	db.SetMaxIdleConns(100)
+	db.SetMaxOpenConns(100)
 	return db, nil
 }
 

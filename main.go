@@ -118,10 +118,12 @@ func main() {
 
 	// start statistics_models repository loop
 	log.Info("Starting statistics_models repository loops...")
-	go statistics.ChampionStatisticsRepo.Loop()
 	go statistics.ChampionDetailStatisticsRepo.Loop()
 	go statistics.TierStatisticsRepo.Loop()
 	go statistics.MasteryStatisticsRepo.Loop()
+
+	// prepare finalize
+	service.PrepareFinalize()
 
 	// Run web server with gin
 	controllers.RunGin()

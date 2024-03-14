@@ -18,14 +18,14 @@ func UseStatisticsRouter(r *gin.RouterGroup) {
 }
 
 func GetChampionStatistics(c *gin.Context) {
-	statistics, err := statistics.ChampionStatisticsRepo.Load()
+	data, err := statistics.ChampionDetailStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	c.JSON(http.StatusOK, statistics)
+	c.JSON(http.StatusOK, data)
 }
 
 func GetChampionStatisticsDetail(c *gin.Context) {
@@ -36,14 +36,14 @@ func GetChampionStatisticsDetail(c *gin.Context) {
 		return
 	}
 
-	statistics, err := statistics.ChampionDetailStatisticsRepo.Load()
+	data, err := statistics.ChampionDetailStatisticsRepo.Load()
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	championDetail, exists := statistics.Data[req.ChampionId]
+	championDetail, exists := data.Data[req.ChampionId]
 	if !exists {
 		util.AbortWithStrJson(c, http.StatusNotFound, "champion not found")
 		return

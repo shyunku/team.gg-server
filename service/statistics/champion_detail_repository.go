@@ -2,7 +2,6 @@ package statistics
 
 import (
 	"encoding/json"
-	"fmt"
 	uuid2 "github.com/google/uuid"
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
@@ -24,92 +23,22 @@ type ChampionPositionStatistics struct {
 	WinCount  int `json:"winCount"`
 }
 
-type MetaPick struct {
-	Id             string
-	Summoner1Id    int
-	Summoner2Id    int
-	PrimaryStyleId int
-	SubStyleId     int
-	Item0          int
-	Item1          int
-	Item2          int
-	Item3          *int
-	Item4          *int
-	Item5          *int
-	Wins           int
-	Total          int
-	WinRate        float64
-	PickRate       float64
-	MetaRank       int
-	MajorTag       string
-	MinorTag       *string
-
-	StartItems []int
-	BasicItems []int
-	SubItems   []int
+type PerkSlot struct {
+	Type      string `json:"type"`
+	SlotLabel string `json:"slotLabel"`
+	Perks     []int  `json:"perks"`
 }
 
-func (m *MetaPick) toRealMeta() ChampionDetailStatisticsMeta {
-	items := []*int{
-		&m.Item0,
-		&m.Item1,
-		&m.Item2,
-		m.Item3,
-		m.Item4,
-		m.Item5,
-	}
-	validItems := make([]int, 0)
-	for _, item := range items {
-		if item != nil {
-			validItems = append(validItems, *item)
-		}
-	}
-	uuid := uuid2.New()
-	return ChampionDetailStatisticsMeta{
-		MetaKey:          fmt.Sprintf("meta-%s-%s", m.MajorTag, uuid.String()),
-		MajorTag:         m.MajorTag,
-		MinorTag:         m.MinorTag,
-		Summoner1Id:      m.Summoner1Id,
-		Summoner2Id:      m.Summoner2Id,
-		MajorPerkStyleId: m.PrimaryStyleId,
-		MinorPerkStyleId: m.SubStyleId,
-		StartItemTree:    m.StartItems,
-		BasicItemTree:    m.BasicItems,
-		ItemTree:         validItems,
-		SubItemTree:      m.SubItems,
-		Count:            m.Total,
-		Win:              m.Wins,
-		PickRate:         m.PickRate,
-		WinRate:          m.WinRate,
-	}
+type PerkGroup struct {
+	PerkStyleName string `json:"perkStyleName"`
+	PerkStyleId   int    `json:"perkStyleId"`
+	SubPerks      []int  `json:"subPerks"`
 }
 
-type MetaGroup []MetaPick
-
-func (mg *MetaGroup) getTotalWinRate() float64 {
-	totalWins := 0
-	totalTotal := 0
-	for _, metaPick := range *mg {
-		totalWins += metaPick.Wins
-		totalTotal += metaPick.Total
-	}
-	return float64(totalWins) / float64(totalTotal)
-}
-
-func (mg *MetaGroup) getTotalPickCount() int {
-	totalPickCount := 0
-	for _, metaPick := range *mg {
-		totalPickCount += metaPick.Total
-	}
-	return totalPickCount
-}
-
-func (mg *MetaGroup) getTotalPickRate() float64 {
-	totalPickRate := 0.0
-	for _, metaPick := range *mg {
-		totalPickRate += metaPick.PickRate
-	}
-	return totalPickRate
+type PerkExtra struct {
+	StatDefenseId int `json:"statDefenseId"`
+	StatFlexId    int `json:"statFlexId"`
+	StatOffenseId int `json:"statOffenseId"`
 }
 
 type ChampionDetailStatisticsMeta struct {
@@ -120,8 +49,12 @@ type ChampionDetailStatisticsMeta struct {
 	Summoner1Id int `json:"summoner1Id"`
 	Summoner2Id int `json:"summoner2Id"`
 
-	MajorPerkStyleId int `json:"majorPerkStyleId"`
-	MinorPerkStyleId int `json:"minorPerkStyleId"`
+	MajorPerkGroup PerkGroup  `json:"majorPerkGroup"`
+	MinorPerkGroup PerkGroup  `json:"minorPerkGroup"`
+	MainSlots      []PerkSlot `json:"mainSlots"`
+	SubSlots       []PerkSlot `json:"subSlots"`
+	StatSlots      []PerkSlot `json:"statSlots"`
+	PerkExtra      PerkExtra  `json:"perkExtra"`
 
 	StartItemTree []int `json:"startItemTree"`
 	BasicItemTree []int `json:"basicItemTree"`
@@ -516,7 +449,7 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 				}
 			}
 
-			if foundTags > 2 || !except {
+			if foundTags > 3 || !except {
 				positionLowDepthItemRecommendations[itemId] = item
 			}
 		}
@@ -604,18 +537,18 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 				}
 			}
 
-			// gold sorter desc
+			// gold sorters
 			descSorter := func(i, j int) bool {
-				itemI, existsI := service.Items[i]
-				itemJ, existsJ := service.Items[j]
+				itemI, existsI := positionLowDepthItemRecommendations[i]
+				itemJ, existsJ := positionLowDepthItemRecommendations[j]
 				if !existsI || !existsJ {
 					return false
 				}
 				return itemI.Gold.Total > itemJ.Gold.Total
 			}
 			ascSorter := func(i, j int) bool {
-				itemI, existsI := service.Items[i]
-				itemJ, existsJ := service.Items[j]
+				itemI, existsI := positionLowDepthItemRecommendations[i]
+				itemJ, existsJ := positionLowDepthItemRecommendations[j]
 				if !existsI || !existsJ {
 					return false
 				}
@@ -656,27 +589,36 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 				pickRate = float64(metaMXDAO.Total) / float64(pickCount)
 			}
 			metaPick := MetaPick{
-				Id:             uuid.String(),
-				Summoner1Id:    metaMXDAO.Summoner1Id,
-				Summoner2Id:    metaMXDAO.Summoner2Id,
-				PrimaryStyleId: metaMXDAO.PrimaryStyle,
-				SubStyleId:     metaMXDAO.SubStyle,
-				Item0:          metaMXDAO.Item0Id,
-				Item1:          metaMXDAO.Item1Id,
-				Item2:          metaMXDAO.Item2Id,
-				Item3:          metaMXDAO.Item3Id,
-				Item4:          metaMXDAO.Item4Id,
-				Item5:          metaMXDAO.Item5Id,
-				Wins:           metaMXDAO.Wins,
-				Total:          metaMXDAO.Total,
-				WinRate:        metaMXDAO.WinRate,
-				PickRate:       pickRate,
-				MetaRank:       metaMXDAO.MetaRank,
-				MajorTag:       majorTag,
-				MinorTag:       minorTag,
-				StartItems:     startItems,
-				BasicItems:     basicItems,
-				SubItems:       subItems,
+				Id:                uuid.String(),
+				Summoner1Id:       metaMXDAO.Summoner1Id,
+				Summoner2Id:       metaMXDAO.Summoner2Id,
+				PrimaryStyleId:    metaMXDAO.PrimaryStyle,
+				PrimaryPerk0:      metaMXDAO.PrimaryPerk0,
+				PrimaryPerk1:      metaMXDAO.PrimaryPerk1,
+				PrimaryPerk2:      metaMXDAO.PrimaryPerk2,
+				PrimaryPerk3:      metaMXDAO.PrimaryPerk3,
+				SubStyleId:        metaMXDAO.SubStyle,
+				SubPerk0:          metaMXDAO.SubPerk0,
+				SubPerk1:          metaMXDAO.SubPerk1,
+				StatPerkDefenseId: metaMXDAO.StatPerkDefense,
+				StatPerkFlexId:    metaMXDAO.StatPerkFlex,
+				StatPerkOffenseId: metaMXDAO.StatPerkOffense,
+				Item0:             metaMXDAO.Item0Id,
+				Item1:             metaMXDAO.Item1Id,
+				Item2:             metaMXDAO.Item2Id,
+				Item3:             metaMXDAO.Item3Id,
+				Item4:             metaMXDAO.Item4Id,
+				Item5:             metaMXDAO.Item5Id,
+				Wins:              metaMXDAO.Wins,
+				Total:             metaMXDAO.Total,
+				WinRate:           metaMXDAO.WinRate,
+				PickRate:          pickRate,
+				MetaRank:          metaMXDAO.MetaRank,
+				MajorTag:          majorTag,
+				MinorTag:          minorTag,
+				StartItems:        startItems,
+				BasicItems:        basicItems,
+				SubItems:          subItems,
 			}
 
 			metaGroup = append(metaGroup, metaPick)
@@ -785,13 +727,28 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 			WinCount:       winCount,
 		}
 		for _, metaPick := range majorMetaPicks {
-			metaTree.MajorMetaPicks = append(metaTree.MajorMetaPicks, metaPick.toRealMeta())
+			meta, err := metaPick.toRealMeta()
+			if err != nil {
+				log.Error(err)
+				return nil, err
+			}
+			metaTree.MajorMetaPicks = append(metaTree.MajorMetaPicks, *meta)
 		}
 		for _, metaPick := range minorMetaPicks {
-			metaTree.MinorMetaPicks = append(metaTree.MinorMetaPicks, metaPick.toRealMeta())
+			meta, err := metaPick.toRealMeta()
+			if err != nil {
+				log.Error(err)
+				return nil, err
+			}
+			metaTree.MinorMetaPicks = append(metaTree.MinorMetaPicks, *meta)
 		}
 		for _, metaPick := range metaGroup {
-			metaTree.MetaPicks = append(metaTree.MetaPicks, metaPick.toRealMeta())
+			meta, err := metaPick.toRealMeta()
+			if err != nil {
+				log.Error(err)
+				return nil, err
+			}
+			metaTree.MetaPicks = append(metaTree.MetaPicks, *meta)
 		}
 
 		if teamPosition == types.TeamPositionTop {

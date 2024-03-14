@@ -14,8 +14,8 @@ const (
 	LoadInitialMatchCountDev = 10
 	LoadMoreMatchCountDev    = 5
 
-	DataExplorerLoopPeriod       = 1 * time.Second
-	DataExplorerLoopPeriodDev    = 60 * time.Second
+	DataExplorerLoopPeriod       = 3 * time.Second
+	DataExplorerLoopPeriodDev    = 3 * time.Minute
 	DataExplorerLoadMatchesCount = 3
 
 	SummonerRankingRevisionPeriod = 24 * time.Hour
@@ -171,4 +171,9 @@ var (
 		}
 		return nil
 	}
+)
+
+const (
+	PerkSlotTypeKeystone = "kKeyStone"
+	PerkSlotTypeStatMod  = "kStatMod"
 )
