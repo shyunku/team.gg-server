@@ -1281,6 +1281,12 @@ func RenewRanks(c *gin.Context) {
 			return
 		}
 
+		// update profile
+		if _, _, err := service.RenewSummonerInfoByPuuid(tx, summonerDAO.Puuid); err != nil {
+			log.Warnf("failed to renew summoner info: %s, but whatever.", err)
+			log.Warn(err)
+		}
+
 		// get rank info
 		if err := service.RenewSummonerLeague(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
 			log.Error(err)

@@ -68,7 +68,6 @@ func (msr *MasteryStatisticsRepository) Period() time.Duration {
 }
 
 func (msr *MasteryStatisticsRepository) Loop() {
-	// must be run in a goroutine
 	for {
 		if _, err := msr.Collect(); err != nil {
 			log.Error(err)

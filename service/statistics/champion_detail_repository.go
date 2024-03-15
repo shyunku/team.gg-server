@@ -146,7 +146,6 @@ func (cdsr *ChampionDetailStatisticsRepository) Period() time.Duration {
 }
 
 func (cdsr *ChampionDetailStatisticsRepository) Loop() {
-	// must be run in a goroutine
 	for {
 		if _, err := cdsr.Collect(); err != nil {
 			log.Error(err)
@@ -449,7 +448,7 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 				}
 			}
 
-			if foundTags > 3 || !except {
+			if !except {
 				positionLowDepthItemRecommendations[itemId] = item
 			}
 		}
@@ -470,19 +469,20 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 					validItems = append(validItems, *item)
 				}
 			}
-			majorItems := make([]service.ItemDataVO, 0)
+			majorItems := make([]int, 0)
 			for _, itemId := range validItems {
-				item, exists := service.Items[itemId]
+				_, exists := service.Items[itemId]
 				if !exists {
 					log.Errorf("item not found: %d", itemId)
 					continue
 				}
-				majorItems = append(majorItems, item)
+				majorItems = append(majorItems, itemId)
 			}
 
 			// get categories of tags from major items
 			tagCategories := make(map[string]int)
-			for _, item := range majorItems {
+			for _, itemId := range majorItems {
+				item := service.Items[itemId]
 				for _, tag := range item.Tags {
 					category := types.GetItemCategories(tag)
 					if category != nil {
@@ -557,14 +557,27 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 
 			// collect start, basic items
 			startItems := make([]int, 0)
-			basicItems := make([]int, 0)
 			for itemId, item := range positionLowDepthItemRecommendations {
 				if item.Gold.Total <= 500 && item.Into == nil {
 					startItems = append(startItems, itemId)
-				} else {
-					basicItems = append(basicItems, itemId)
 				}
 			}
+			basicItems := make([]int, 0)
+			basicItemMap := make(map[int]bool)
+			for _, itemId := range majorItems {
+				depth1Items, err := GetDepth1Items(itemId)
+				if err != nil {
+					log.Error(err)
+					return nil, err
+				}
+				for _, depth1Item := range depth1Items {
+					basicItemMap[depth1Item] = true
+				}
+			}
+			for itemId, _ := range basicItemMap {
+				basicItems = append(basicItems, itemId)
+			}
+
 			// collect sub items
 			subItems := make([]int, 0)
 			for _, itemCount := range positionItemCounts {

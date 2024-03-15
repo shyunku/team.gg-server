@@ -1,11 +1,15 @@
 package controllers
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/shyunku-libraries/go-logger"
+	"net/http"
 	"os"
+	"sync"
 	"team.gg-server/controllers/middlewares"
 	"team.gg-server/controllers/socket"
 	"team.gg-server/controllers/test"
@@ -60,19 +64,32 @@ func SetupRouter() *gin.Engine {
 	return r
 }
 
-func RunGin() {
+func RunGin(ctx context.Context, waitGroup *sync.WaitGroup) {
 	log.Infof("Starting server on port on %s...", core.AppServerPort)
 	r := SetupRouter()
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%s", core.AppServerPort),
+		Handler: r,
+	}
+
+	go func() {
+		<-ctx.Done()
+		log.Info("server is shutting down...")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			log.Fatalf("server shutdown failed:%+v", err)
+		}
+		log.Info("server shutdown complete.")
+		waitGroup.Done()
+	}()
+
+	// 서버 시작
 	if core.DebugMode {
-		if err := r.Run(fmt.Sprintf(":%s", core.AppServerPort)); err != nil {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 			os.Exit(-3)
 		}
 	} else {
-		if err := r.RunTLS(
-			fmt.Sprintf(":%s", core.AppServerPort),
-			"certificates/cert.pem",
-			"certificates/key.pem"); err != nil {
+		if err := srv.ListenAndServeTLS("certificates/cert.pem", "certificates/key.pem"); !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 			os.Exit(-3)
 		}

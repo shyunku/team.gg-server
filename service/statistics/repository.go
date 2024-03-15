@@ -1,8 +1,8 @@
 package statistics
 
 import (
-	"github.com/jmoiron/sqlx"
 	"path"
+	"team.gg-server/libs/db"
 	"team.gg-server/util"
 	"time"
 )
@@ -10,7 +10,7 @@ import (
 const StatisticsDataPath = "datafiles/statistics"
 
 var (
-	StatisticsDB                 *sqlx.DB                            = nil
+	StatisticsDB                 *db.Database                        = nil
 	ChampionDetailStatisticsRepo *ChampionDetailStatisticsRepository = nil
 	TierStatisticsRepo           *TierStatisticsRepository           = nil
 	MasteryStatisticsRepo        *MasteryStatisticsRepository        = nil

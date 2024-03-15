@@ -73,7 +73,6 @@ func (tsr *TierStatisticsRepository) Period() time.Duration {
 }
 
 func (tsr *TierStatisticsRepository) Loop() {
-	// must be run in a goroutine
 	for {
 		if _, err := tsr.Collect(); err != nil {
 			log.Error(err)

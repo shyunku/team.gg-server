@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/joho/godotenv"
 	log "github.com/shyunku-libraries/go-logger"
 	"math/rand"
 	"os"
+	"sync"
 	"team.gg-server/controllers"
 	"team.gg-server/core"
 	"team.gg-server/libs/crypto"
@@ -17,7 +19,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.4.3"
+const VERSION = "0.5.0"
 
 func main() {
 	fmt.Println(`
@@ -34,7 +36,9 @@ func main() {
 	// randomize seed
 	rand.Seed(time.Now().UnixNano())
 
-	// Create Jwt secret key if needed
+	// Create Cancel Context
+	ctx, cancel := context.WithCancel(context.Background())
+	var waitGroup sync.WaitGroup
 
 	// Load environment variables
 	log.Info("Initializing environments...")
@@ -122,9 +126,22 @@ func main() {
 	go statistics.TierStatisticsRepo.Loop()
 	go statistics.MasteryStatisticsRepo.Loop()
 
-	// prepare finalize
-	service.PrepareFinalize()
-
 	// Run web server with gin
-	controllers.RunGin()
+	waitGroup.Add(1)
+	go controllers.RunGin(ctx, &waitGroup)
+
+	// prepare finalize
+	service.PrepareFinalize(cancel, &waitGroup, []service.Finalizer{
+		func() error {
+			if err := db.Root.Finalize(); err != nil {
+				log.Fatal(err)
+				return err
+			}
+			if err := statistics.StatisticsDB.Finalize(); err != nil {
+				log.Fatal(err)
+				return err
+			}
+			return nil
+		},
+	})
 }

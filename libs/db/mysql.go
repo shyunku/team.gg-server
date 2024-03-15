@@ -9,7 +9,38 @@ import (
 	"os"
 )
 
-var Root *sqlx.DB = nil
+var Root *Database = nil
+
+type Database struct {
+	*sqlx.DB
+}
+
+type DatabaseProcess struct {
+	Id      string  `db:"Id"`
+	User    *string `db:"User"`
+	Host    *string `db:"Host"`
+	Db      *string `db:"db"`
+	Command *string `db:"Command"`
+	Time    *string `db:"Time"`
+	State   *string `db:"State"`
+	Info    *string `db:"Info"`
+}
+
+func (d *Database) Finalize() error {
+	// get all process
+	var processList []DatabaseProcess
+	if err := d.Select(&processList, "SHOW FULL PROCESSLIST"); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+	for _, process := range processList {
+		if process.Db != nil && *process.Db == "teamgg" {
+			_, _ = d.Exec(fmt.Sprintf("KILL %s", process.Id))
+		}
+	}
+	return d.Close()
+}
 
 type DatabaseInitializer func(db *sqlx.DB) error
 
@@ -67,9 +98,9 @@ func (d *DatabaseConfig) getEndpointString() string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", d.User, d.Password, d.Host, d.Port, d.DatabaseName)
 }
 
-func Initiate(initializer DatabaseInitializer) (db *sqlx.DB, err error) {
+func Initiate(initializer DatabaseInitializer) (*Database, error) {
 	endPoint := getEndpoint()
-	db, err = sqlx.Open("mysql", endPoint)
+	db, err := sqlx.Open("mysql", endPoint)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +115,9 @@ func Initiate(initializer DatabaseInitializer) (db *sqlx.DB, err error) {
 	db.SetConnMaxIdleTime(0)
 	db.SetMaxIdleConns(100)
 	db.SetMaxOpenConns(100)
-	return db, nil
+	return &Database{
+		DB: db,
+	}, nil
 }
 
 type Context interface {
