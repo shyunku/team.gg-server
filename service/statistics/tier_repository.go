@@ -57,9 +57,6 @@ func NewTierStatisticsRepository() *TierStatisticsRepository {
 	tsr := &TierStatisticsRepository{
 		Cache: nil,
 	}
-	go func() {
-		_, _ = tsr.Load()
-	}()
 	return tsr
 }
 

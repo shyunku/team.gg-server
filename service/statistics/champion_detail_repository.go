@@ -130,9 +130,6 @@ func NewChampionDetailStatisticsRepository() *ChampionDetailStatisticsRepository
 	cdsr := &ChampionDetailStatisticsRepository{
 		Cache: nil,
 	}
-	go func() {
-		_, _ = cdsr.Load()
-	}()
 	return cdsr
 }
 
