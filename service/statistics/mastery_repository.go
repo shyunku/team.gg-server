@@ -52,7 +52,9 @@ func NewMasteryStatisticsRepository() *MasteryStatisticsRepository {
 	msr := &MasteryStatisticsRepository{
 		Cache: nil,
 	}
-	_, _ = msr.Load()
+	go func() {
+		_, _ = msr.Load()
+	}()
 	return msr
 }
 
