@@ -820,10 +820,6 @@ func (cdsr *ChampionDetailStatisticsRepository) Load() (*ChampionDetailStatistic
 	filePath := keyPath(cdsr.key())
 	_, err := os.Stat(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.Debugf("file not found: %s", filePath)
-			return cdsr.Collect()
-		}
 		log.Error(err)
 		return nil, nil
 	}

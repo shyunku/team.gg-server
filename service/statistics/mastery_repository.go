@@ -187,10 +187,6 @@ func (msr *MasteryStatisticsRepository) Load() (*MasteryStatistics, error) {
 	filePath := keyPath(msr.key())
 	_, err := os.Stat(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.Debugf("file not found: %s", filePath)
-			return msr.Collect()
-		}
 		log.Error(err)
 		return nil, nil
 	}

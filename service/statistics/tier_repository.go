@@ -241,10 +241,6 @@ func (tsr *TierStatisticsRepository) Load() (*TierStatistics, error) {
 	filePath := keyPath(tsr.key())
 	_, err := os.Stat(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.Debugf("file not found: %s", filePath)
-			return tsr.Collect()
-		}
 		log.Error(err)
 		return nil, nil
 	}
