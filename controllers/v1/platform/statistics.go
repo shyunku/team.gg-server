@@ -26,6 +26,11 @@ func GetChampionStatistics(c *gin.Context) {
 		return
 	}
 
+	if data == nil {
+		util.AbortWithStrJson(c, http.StatusServiceUnavailable, "not found")
+		return
+	}
+
 	innerData := make(map[int]GetChampionStatisticsResponseItem)
 	if data.Data != nil {
 		for k, v := range data.Data {
