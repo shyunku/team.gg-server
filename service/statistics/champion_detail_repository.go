@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"team.gg-server/core"
+	"team.gg-server/models/mixed"
 	"team.gg-server/models/mixed/statistics_models"
 	"team.gg-server/service"
 	"team.gg-server/types"
@@ -119,6 +120,7 @@ type ChampionDetailStatisticsItem struct {
 
 type ChampionDetailStatistics struct {
 	UpdatedAt time.Time                            `json:"updatedAt"`
+	Patches   []string                             `json:"patches"`
 	Data      map[int]ChampionDetailStatisticsItem `json:"data"`
 }
 
@@ -130,6 +132,7 @@ func NewChampionDetailStatisticsRepository() *ChampionDetailStatisticsRepository
 	cdsr := &ChampionDetailStatisticsRepository{
 		Cache: nil,
 	}
+	_, _ = cdsr.Load()
 	return cdsr
 }
 
@@ -168,7 +171,8 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 	for _, championDetailStatisticMXDAO := range championDetailStatisticMXDAOs {
 		championDetailStatisticsMXDAOmap[championDetailStatisticMXDAO.ChampionId] = championDetailStatisticMXDAO
 	}
-	log.Debugf("championDetailStatisticMXDAOs: %d", len(championDetailStatisticMXDAOs))
+	log.Debugf("championDetailStatisticMXDAOs fetch complete: %d, size: %s",
+		len(championDetailStatisticMXDAOs), util.MemorySizeOfArray(championDetailStatisticMXDAOs))
 
 	// collect champion pick count by team position
 	championPositionStatisticsMXDAOmap := make(map[int]map[string]ChampionPositionStatistics)
@@ -197,9 +201,16 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 		}
 	}
 
+	recentMatchGameVersions, recentMatchGameShortVersions, err := mixed.GetRecentMatchGameVersions_byDescendingShortVersion_withCount(StatisticsDB, 2)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	log.Debugf("recentMatchGameVersions: %v", recentMatchGameVersions)
+
 	// collect meta
 	championDetailStatisticsMetaMap := make(map[int][]statistics_models.ChampionDetailStatisticsMetaMXDAO)
-	championDetailStatisticsMetaMXDAOs, err := statistics_models.GetChampionDetailStatisticsMetaMXDAOs(StatisticsDB)
+	championDetailStatisticsMetaMXDAOs, err := statistics_models.GetChampionDetailStatisticsMetaMXDAOs_optimized(StatisticsDB, recentMatchGameVersions)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -211,7 +222,7 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 		}
 		championDetailStatisticsMetaMap[championId] = append(championDetailStatisticsMetaMap[championId], meta)
 	}
-	log.Debugf("championDetailStatisticsMetaMXDAOs: %d, size: %s",
+	log.Debugf("championDetailStatisticsMetaMXDAOs fetch complete: %d, size: %s",
 		len(championDetailStatisticsMetaMXDAOs), util.MemorySizeOfArray(championDetailStatisticsMetaMXDAOs))
 
 	stats := make(map[int]ChampionDetailStatisticsItem)
@@ -299,6 +310,7 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 
 	cdsr.Cache = &ChampionDetailStatistics{
 		UpdatedAt: time.Now(),
+		Patches:   recentMatchGameShortVersions,
 		Data:      stats,
 	}
 
@@ -557,7 +569,7 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 			// collect start, basic items
 			startItems := make([]int, 0)
 			for itemId, item := range positionLowDepthItemRecommendations {
-				if item.Gold.Total <= 500 && item.Into == nil {
+				if item.Gold.Total < 500 && item.Into == nil {
 					startItems = append(startItems, itemId)
 				}
 			}

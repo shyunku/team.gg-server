@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	log "github.com/shyunku-libraries/go-logger"
 	"os"
 )
 
@@ -29,7 +30,7 @@ type DatabaseProcess struct {
 func (d *Database) Finalize() error {
 	// get all process
 	var processList []DatabaseProcess
-	if err := d.Select(&processList, "SHOW FULL PROCESSLIST"); err != nil {
+	if err := d.Select(&processList, "SHOW PROCESSLIST"); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
@@ -37,6 +38,11 @@ func (d *Database) Finalize() error {
 	for _, process := range processList {
 		if process.Db != nil && *process.Db == "teamgg" {
 			_, _ = d.Exec(fmt.Sprintf("KILL %s", process.Id))
+			query := "???"
+			if process.Info != nil {
+				query = *process.Info
+			}
+			log.Debugf("Killed process: %s --- %s", process.Id, query)
 		}
 	}
 	return d.Close()
@@ -124,4 +130,10 @@ type Context interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Get(dest interface{}, query string, args ...interface{}) error
 	Select(dest interface{}, query string, args ...interface{}) error
+}
+
+type TxContext interface {
+	Context
+	Commit() error
+	Rollback() error
 }

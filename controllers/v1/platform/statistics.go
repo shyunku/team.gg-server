@@ -13,6 +13,7 @@ func UseStatisticsRouter(r *gin.RouterGroup) {
 
 	g.GET("/champion", GetChampionStatistics)
 	g.GET("/champion-detail", GetChampionStatisticsDetail)
+	g.GET("/meta", GetMetaStatistics)
 	g.GET("/tier", GetTierStatistics)
 	g.GET("/mastery", GetMasteryStatistics)
 }
@@ -25,7 +26,27 @@ func GetChampionStatistics(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, data)
+	innerData := make(map[int]GetChampionStatisticsResponseItem)
+	if data.Data != nil {
+		for k, v := range data.Data {
+			innerData[k] = GetChampionStatisticsResponseItem{
+				ChampionId:   k,
+				ChampionName: v.ChampionName,
+				Win:          v.Win,
+				Total:        v.Total,
+				AvgPickRate:  v.AvgPickRate,
+				AvgBanRate:   v.AvgBanRate,
+				AvgWinRate:   v.AvgWinRate,
+				ExtraStats:   v.ExtraStats,
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, GetChampionStatisticsResponseDto{
+		UpdatedAt: data.UpdatedAt,
+		Patches:   data.Patches,
+		Data:      innerData,
+	})
 }
 
 func GetChampionStatisticsDetail(c *gin.Context) {
@@ -50,6 +71,17 @@ func GetChampionStatisticsDetail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, championDetail)
+}
+
+func GetMetaStatistics(c *gin.Context) {
+	statistics, err := statistics.ChampionDetailStatisticsRepo.Load()
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, statistics)
 }
 
 func GetTierStatistics(c *gin.Context) {

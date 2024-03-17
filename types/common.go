@@ -15,7 +15,7 @@ const (
 	LoadMoreMatchCountDev    = 5
 
 	DataExplorerLoopPeriod       = 3 * time.Second
-	DataExplorerLoopPeriodDev    = 3 * time.Minute
+	DataExplorerLoopPeriodDev    = 365 * 24 * time.Hour
 	DataExplorerLoadMatchesCount = 3
 
 	SummonerRankingRevisionPeriod = 24 * time.Hour

@@ -19,6 +19,7 @@ func getMatchGameVersionMXDAOs(db db.Context) ([]MatchGameVersionMXDAO, error) {
 		       SUBSTRING_INDEX(game_version, '.', 2) AS game_short_version,
 		       COUNT(*) AS count
 		FROM matches
+		WHERE game_version != ''
 		GROUP BY game_version;
 	`); err != nil {
 		return nil, err
@@ -47,10 +48,10 @@ func getMatchGameVersionMXDAOs_byDescendingVersion(db db.Context) ([]MatchGameVe
 	return matchGameVersionMXDAOs, nil
 }
 
-func GetRecentMatchGameVersions_byDescendingShortVersion_withCount(db db.Context, count int) ([]string, error) {
+func GetRecentMatchGameVersions_byDescendingShortVersion_withCount(db db.Context, count int) ([]string, []string, error) {
 	matchGameVersionMXDAOs, err := getMatchGameVersionMXDAOs_byDescendingVersion(db)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// get recent game versions
@@ -65,5 +66,9 @@ func GetRecentMatchGameVersions_byDescendingShortVersion_withCount(db db.Context
 		}
 		recentMatchGameVersions = append(recentMatchGameVersions, matchGameVersionMXDAO.GameVersion)
 	}
-	return recentMatchGameVersions, nil
+	gameShortVersions := make([]string, 0)
+	for _, recentMatchGameVersion := range recentMatchGameVersions {
+		gameShortVersions = append(gameShortVersions, recentMatchGameVersion)
+	}
+	return recentMatchGameVersions, gameShortVersions, nil
 }
