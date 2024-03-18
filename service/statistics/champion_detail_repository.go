@@ -161,9 +161,17 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 	timer := util.NewTimerWithName("ChampionDetailStatisticsRepository")
 	timer.Start()
 
+	// collect recent versions
+	recentMatchGameVersions, recentMatchGameShortVersions, err := mixed.GetRecentMatchGameVersions_byDescendingShortVersion_withCount(StatisticsDB, 2)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	log.Debugf("recentMatchGameVersions: %v", recentMatchGameVersions)
+
 	// collect data
 	championDetailStatisticsMXDAOmap := make(map[int]statistics_models.ChampionDetailStatisticMXDAO)
-	championDetailStatisticMXDAOs, err := statistics_models.GetChampionDetailStatisticMXDAOs(StatisticsDB)
+	championDetailStatisticMXDAOs, err := statistics_models.GetChampionDetailStatisticMXDAOs(StatisticsDB, recentMatchGameVersions)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -176,7 +184,7 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 
 	// collect champion pick count by team position
 	championPositionStatisticsMXDAOmap := make(map[int]map[string]ChampionPositionStatistics)
-	championPositionStatisticsMXDAOs, err := statistics_models.GetChampionPositionStatisticsMXDAOs(StatisticsDB)
+	championPositionStatisticsMXDAOs, err := statistics_models.GetChampionPositionStatisticsMXDAOs(StatisticsDB, recentMatchGameVersions)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -200,13 +208,6 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 			WinCount:  championPositionStatisticsMXDAO.Win,
 		}
 	}
-
-	recentMatchGameVersions, recentMatchGameShortVersions, err := mixed.GetRecentMatchGameVersions_byDescendingShortVersion_withCount(StatisticsDB, 2)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	log.Debugf("recentMatchGameVersions: %v", recentMatchGameVersions)
 
 	// collect meta
 	championDetailStatisticsMetaMap := make(map[int][]statistics_models.ChampionDetailStatisticsMetaMXDAO)

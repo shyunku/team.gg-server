@@ -571,6 +571,7 @@ func RecalculateCustomGameBalance(db db.Context, configId string) error {
 	configDAO.LineFairness = fairnessVO.LineFairness
 	configDAO.TierFairness = fairnessVO.TierFairness
 	configDAO.LineSatisfaction = fairnessVO.LineSatisfaction
+	configDAO.LastUpdatedAt = time.Now()
 	if err := configDAO.Upsert(db); err != nil {
 		log.Error(err)
 		return err

@@ -56,6 +56,7 @@ func GetRecentMatchGameVersions_byDescendingShortVersion_withCount(db db.Context
 
 	// get recent game versions
 	recentMatchGameVersions := make([]string, 0)
+	gameShortVersions := make([]string, 0)
 	seen := make(map[string]bool)
 	for _, matchGameVersionMXDAO := range matchGameVersionMXDAOs {
 		if _, exists := seen[matchGameVersionMXDAO.GameShortVersion]; !exists {
@@ -66,9 +67,8 @@ func GetRecentMatchGameVersions_byDescendingShortVersion_withCount(db db.Context
 		}
 		recentMatchGameVersions = append(recentMatchGameVersions, matchGameVersionMXDAO.GameVersion)
 	}
-	gameShortVersions := make([]string, 0)
-	for _, recentMatchGameVersion := range recentMatchGameVersions {
-		gameShortVersions = append(gameShortVersions, recentMatchGameVersion)
+	for shortVersion, _ := range seen {
+		gameShortVersions = append(gameShortVersions, shortVersion)
 	}
 	return recentMatchGameVersions, gameShortVersions, nil
 }

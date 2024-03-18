@@ -12,6 +12,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/joho/godotenv v1.5.1
+	github.com/lib/pq v1.2.0
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/schollz/progressbar/v3 v3.14.1
 	github.com/shyunku-libraries/go-logger v0.1.7

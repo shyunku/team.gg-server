@@ -3,6 +3,7 @@ package statistics_models
 import (
 	"database/sql"
 	"errors"
+	"github.com/jmoiron/sqlx"
 	"team.gg-server/libs/db"
 )
 
@@ -37,9 +38,10 @@ type ChampionDetailStatisticMXDAO struct {
 	AvgDamageSelfMitigatedPerSec float64 `db:"avg_damage_self_mitigated_per_sec" json:"avgDamageSelfMitigatedPerSec"`
 }
 
-func GetChampionDetailStatisticMXDAOs(db db.Context) ([]ChampionDetailStatisticMXDAO, error) {
+func GetChampionDetailStatisticMXDAOs(db db.Context, versions []string) ([]ChampionDetailStatisticMXDAO, error) {
 	var statistics []ChampionDetailStatisticMXDAO
-	if err := db.Select(&statistics, `
+
+	query, args, err := sqlx.In(`
 		WITH ChampionStats AS (
 			SELECT
 				mp.champion_id AS champion_id,
@@ -69,7 +71,7 @@ func GetChampionDetailStatisticMXDAOs(db db.Context) ([]ChampionDetailStatisticM
 			LEFT JOIN match_teams t ON mp.team_id = t.team_id AND m.match_id = t.match_id
 			LEFT JOIN match_participant_details mpd ON mp.match_id = mpd.match_id
 				   AND mp.match_participant_id = mpd.match_participant_id
-			WHERE game_duration > 0
+			WHERE game_duration > 0 AND game_version IN (?)
 			GROUP BY mp.champion_id
 		), BanStats AS (
 			SELECT
@@ -89,11 +91,18 @@ func GetChampionDetailStatisticMXDAOs(db db.Context) ([]ChampionDetailStatisticM
 		FROM ChampionStats cs
 		LEFT JOIN BanStats bs ON cs.champion_id = bs.champion_id
 		CROSS JOIN MatchCount mc;
-	`); err != nil {
+	`, versions)
+	if err != nil {
+		return nil, err
+	}
+
+	query = db.Rebind(query)
+	if err := db.Select(&statistics, query, args...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return make([]ChampionDetailStatisticMXDAO, 0), nil
 		}
 		return nil, err
 	}
+
 	return statistics, nil
 }
