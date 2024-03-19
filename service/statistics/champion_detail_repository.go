@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"team.gg-server/core"
+	"team.gg-server/libs/db"
 	"team.gg-server/models/mixed"
 	"team.gg-server/models/mixed/statistics_models"
 	"team.gg-server/service"
@@ -50,38 +51,75 @@ type ChampionDetailStatisticsMeta struct {
 	Summoner1Id int `json:"summoner1Id"`
 	Summoner2Id int `json:"summoner2Id"`
 
-	MajorPerkGroup PerkGroup  `json:"majorPerkGroup"`
-	MinorPerkGroup PerkGroup  `json:"minorPerkGroup"`
-	MainSlots      []PerkSlot `json:"mainSlots"`
-	SubSlots       []PerkSlot `json:"subSlots"`
-	StatSlots      []PerkSlot `json:"statSlots"`
-	PerkExtra      PerkExtra  `json:"perkExtra"`
+	MajorPerkGroup PerkGroup `json:"majorPerkGroup"` // 메인 룬 추천
+	MinorPerkGroup PerkGroup `json:"minorPerkGroup"` // Sub 룬 추천
+	PerkExtra      PerkExtra `json:"perkExtra"`      // 메인 룬 스탯 추천
 
-	StartItemTree []int `json:"startItemTree"`
-	BasicItemTree []int `json:"basicItemTree"`
-	ItemTree      []int `json:"itemTree"`
-	SubItemTree   []int `json:"subItemTree"`
+	MainSlots []PerkSlot `json:"mainSlots"` // 메인 룬 Placeholders
+	SubSlots  []PerkSlot `json:"subSlots"`  // Sub 룬 Placeholders
+	StatSlots []PerkSlot `json:"statSlots"` // 메인 룬 스탯 Placeholders
 
-	Count int `json:"count"`
-	Win   int `json:"win"`
+	StartItemTree []int `json:"startItemTree"` // 시작 아이템 추천
+	BasicItemTree []int `json:"basicItemTree"` // 기본 아이템 추천
+	ItemTree      []int `json:"itemTree"`      // 메인 아이템 추천
+	SubItemTree   []int `json:"subItemTree"`   // 부가 아이템 추천
+
+	Count int `json:"count"` // 메타 픽 수
+	Win   int `json:"win"`   // 해당 메타 승리 수
 
 	WinRate  float64 `json:"winRate"`
 	PickRate float64 `json:"pickRate"`
 }
 
+type ChampionCounterStatistics struct {
+	CounterChampionId   int    `json:"counterChampionId"`
+	CounterChampionName string `json:"counterChampionName"`
+
+	AvgKills   float64 `json:"avgKills"`
+	AvgDeaths  float64 `json:"avgDeaths"`
+	AvgAssists float64 `json:"avgAssists"`
+
+	CounterAvgKills   *float64 `json:"counterAvgKills"`
+	CounterAvgDeaths  *float64 `json:"counterAvgDeaths"`
+	CounterAvgAssists *float64 `json:"counterAvgAssists"`
+
+	Summoner1Id int `json:"summoner1Id"`
+	Summoner2Id int `json:"summoner2Id"`
+
+	MajorPerkGroup PerkGroup `json:"majorPerkGroup"` // 메인 룬 추천
+	MinorPerkGroup PerkGroup `json:"minorPerkGroup"` // Sub 룬 추천
+	PerkExtra      PerkExtra `json:"perkExtra"`      // 메인 룬 스탯 추천
+
+	MainSlots []PerkSlot `json:"mainSlots"` // 메인 룬 Placeholders
+	SubSlots  []PerkSlot `json:"subSlots"`  // Sub 룬 Placeholders
+	StatSlots []PerkSlot `json:"statSlots"` // 메인 룬 스탯 Placeholders
+
+	StartItemTree []int `json:"startItemTree"` // 시작 아이템 추천
+	BasicItemTree []int `json:"basicItemTree"` // 기본 아이템 추천
+	ItemTree      []int `json:"itemTree"`      // 메인 아이템 추천
+	SubItemTree   []int `json:"subItemTree"`   // 부가 아이템 추천
+
+	Count int `json:"count"` // 메타 픽 수
+	Win   int `json:"win"`   // 해당 메타 승리 수
+
+	WinRate         float64  `json:"winRate"`
+	ExpectedWinRate *float64 `json:"expectedWinRate"` // 해당 룬/아이템 조합의 기대 승률
+}
+
 type ChampionDetailStatisticsMetaTree struct {
-	MajorMetaPicks []ChampionDetailStatisticsMeta `json:"majorMetaPicks"`
-	MinorMetaPicks []ChampionDetailStatisticsMeta `json:"minorMetaPick"`
-	MetaPicks      []ChampionDetailStatisticsMeta `json:"metaPicks"`
-	PickCount      int                            `json:"pickCount"`
-	WinCount       int                            `json:"winCount"`
+	MajorMetaPicks []ChampionDetailStatisticsMeta    `json:"majorMetaPicks"`
+	MinorMetaPicks []ChampionDetailStatisticsMeta    `json:"minorMetaPick"`
+	MetaPicks      []ChampionDetailStatisticsMeta    `json:"metaPicks"`
+	PickCount      int                               `json:"pickCount"`
+	WinCount       int                               `json:"winCount"`
+	CounterMap     map[int]ChampionCounterStatistics `json:"counterMap"`
 }
 
 type ChampionDetailStatisticsPositionMetaTree struct {
 	Top     *ChampionDetailStatisticsMetaTree `json:"top"`
 	Jungle  *ChampionDetailStatisticsMetaTree `json:"jungle"`
 	Mid     *ChampionDetailStatisticsMetaTree `json:"mid"`
-	ADC     *ChampionDetailStatisticsMetaTree `json:"adc"`
+	Adc     *ChampionDetailStatisticsMetaTree `json:"adc"`
 	Support *ChampionDetailStatisticsMetaTree `json:"support"`
 }
 
@@ -209,9 +247,20 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 		}
 	}
 
+	if err := statistics_models.CreateTemporaryTables(StatisticsDB, recentMatchGameVersions); err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	defer func(db db.Context) {
+		err := statistics_models.DropTemporaryTables(db)
+		if err != nil {
+			log.Error(err)
+		}
+	}(StatisticsDB)
+
 	// collect meta
 	championDetailStatisticsMetaMap := make(map[int][]statistics_models.ChampionDetailStatisticsMetaMXDAO)
-	championDetailStatisticsMetaMXDAOs, err := statistics_models.GetChampionDetailStatisticsMetaMXDAOs_optimized(StatisticsDB, recentMatchGameVersions)
+	championDetailStatisticsMetaMXDAOs, err := statistics_models.GetChampionDetailStatisticsMetaMXDAOs(StatisticsDB)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -225,6 +274,23 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 	}
 	log.Debugf("championDetailStatisticsMetaMXDAOs fetch complete: %d, size: %s",
 		len(championDetailStatisticsMetaMXDAOs), util.MemorySizeOfArray(championDetailStatisticsMetaMXDAOs))
+
+	// collect counter data
+	championCounterStatisticsMap := make(map[int][]statistics_models.ChampionCounterStatisticsMXDAO) // key: championId
+	championCounterStatisticsMXDAOs, err := statistics_models.GetChampionCounterStatisticsMXDAOs(StatisticsDB)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	for _, counter := range championCounterStatisticsMXDAOs {
+		championId := counter.ChampionId
+		if _, exists := championCounterStatisticsMap[championId]; !exists {
+			championCounterStatisticsMap[championId] = make([]statistics_models.ChampionCounterStatisticsMXDAO, 0)
+		}
+		championCounterStatisticsMap[championId] = append(championCounterStatisticsMap[championId], counter)
+	}
+	log.Debugf("championCounterStatisticsMXDAOs fetch complete: %d, size: %s",
+		len(championCounterStatisticsMXDAOs), util.MemorySizeOfArray(championCounterStatisticsMXDAOs))
 
 	stats := make(map[int]ChampionDetailStatisticsItem)
 	for key, champion := range service.Champions {
@@ -246,7 +312,13 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 			continue
 		}
 
-		metaTree, err := cdsr.collectEachChampionMetas(champion, metas, championPositionStatisticsMXDAO)
+		counters, exists := championCounterStatisticsMap[championId]
+		if !exists {
+			log.Warnf("championId not found: %d", championId)
+			counters = make([]statistics_models.ChampionCounterStatisticsMXDAO, 0)
+		}
+
+		metaTree, err := cdsr.collectEachChampionMetas(championId, championPositionStatisticsMXDAO, metas, counters)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -324,17 +396,17 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 }
 
 func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
-	champion service.ChampionDataVO,
-	championDetailStatisticsMetaMXDAOs []statistics_models.ChampionDetailStatisticsMetaMXDAO,
+	championId int,
 	countByPosition map[string]ChampionPositionStatistics,
+	championDetailStatisticsMetaMXDAOs []statistics_models.ChampionDetailStatisticsMetaMXDAO,
+	championCounterMXDAOs []statistics_models.ChampionCounterStatisticsMXDAO,
 ) (*ChampionDetailStatisticsPositionMetaTree, error) {
-	isAdType := champion.Info.Attack >= 5
-	isApType := champion.Info.Magic >= 5
+
 	metaTrees := &ChampionDetailStatisticsPositionMetaTree{
 		Top:     nil,
 		Jungle:  nil,
 		Mid:     nil,
-		ADC:     nil,
+		Adc:     nil,
 		Support: nil,
 	}
 
@@ -354,6 +426,16 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 		metaMXDAOsByPosition[teamPosition] = append(metaMXDAOsByPosition[teamPosition], championDetailStatisticsMetaMXDAO)
 	}
 
+	// key: teamPosition -> counterChampionId -> ChampionCounterStatisticsMXDAO
+	countersByPositionMap := make(map[string]map[int]statistics_models.ChampionCounterStatisticsMXDAO)
+	for _, counter := range championCounterMXDAOs {
+		teamPosition := counter.TeamPosition
+		if _, exists := countersByPositionMap[teamPosition]; !exists {
+			countersByPositionMap[teamPosition] = make(map[int]statistics_models.ChampionCounterStatisticsMXDAO)
+		}
+		countersByPositionMap[teamPosition][counter.EnemyChampionId] = counter
+	}
+
 	for teamPosition, metaMXDAOs := range metaMXDAOsByPosition {
 		pickCount, winCount := 0, 0
 		positionStatistics, ok := countByPosition[teamPosition]
@@ -367,129 +449,37 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 
 		positionItems := make([]int, 0)
 		for _, metaMXDAO := range metaMXDAOs {
-			items := []*int{
+			majorItems := getValidItems([]*int{
 				&metaMXDAO.Item0Id,
 				&metaMXDAO.Item1Id,
 				&metaMXDAO.Item2Id,
 				metaMXDAO.Item3Id,
 				metaMXDAO.Item4Id,
 				metaMXDAO.Item5Id,
-			}
-			for _, item := range items {
-				if item != nil {
-					positionItems = append(positionItems, *item)
-				}
+			})
+			for _, itemId := range majorItems {
+				positionItems = append(positionItems, itemId)
 			}
 		}
-		type PositionItemCount struct {
-			itemId int
-			count  int
-		}
-		positionItemCountMap := make(map[int]int)
-		for _, item := range positionItems {
-			if _, exists := positionItemCountMap[item]; !exists {
-				positionItemCountMap[item] = 0
-			}
-			positionItemCountMap[item]++
-		}
-		positionItemCounts := make([]PositionItemCount, 0)
-		for itemId, count := range positionItemCountMap {
-			positionItemCounts = append(positionItemCounts, PositionItemCount{itemId: itemId, count: count})
-		}
-		sort.SliceStable(positionItemCounts, func(i, j int) bool {
-			return positionItemCounts[i].count > positionItemCounts[j].count
-		})
-		positionItemTags := make(map[string]bool)
-		for _, itemCount := range positionItemCounts {
-			item, exists := service.Items[itemCount.itemId]
-			if !exists {
-				log.Errorf("item not found: %d", itemCount.itemId)
-				continue
-			}
-			for _, tag := range item.Tags {
-				positionItemTags[tag] = true
-			}
-		}
-		positionLowDepthItemRecommendations := make(map[int]service.ItemDataVO)
-		for itemId, item := range service.Items {
-			if !(item.Depth == nil &&
-				item.Gold.Purchasable &&
-				item.Gold.Total > 0 &&
-				item.RequiredAlly == nil &&
-				item.AvailableOnMapId(types.MapTypeSummonersRift)) {
-				continue
-			}
-			foundTags := 0
-			tagMap := make(map[string]bool)
-			for _, tag := range item.Tags {
-				if _, exists := positionItemTags[tag]; exists {
-					foundTags++
-				}
-				tagMap[tag] = true
-			}
 
-			hasTag := func(tag string) bool {
-				_, exists := tagMap[tag]
-				return exists
-			}
-
-			onlyForJungle, onlyForLane := hasTag(types.ItemTagJungle), hasTag(types.ItemTagLane)
-			onlyForAd := hasTag(types.ItemTagDamage) || hasTag(types.ItemTagCriticalStrike)
-			onlyForAp := hasTag(types.ItemTagSpellDamage) || hasTag(types.ItemTagSpellVamp)
-			forVision, _ := hasTag(types.ItemTagVision), hasTag(types.ItemTagGoldPer)
-			forConsumable := hasTag(types.ItemTagConsumable)
-
-			if onlyForJungle && onlyForLane {
-				onlyForJungle, onlyForLane = false, false
-			}
-			if onlyForAd && onlyForAp {
-				onlyForAd, onlyForAp = false, false
-			}
-
-			except := false
-			if (teamPosition == types.TeamPositionJungle && onlyForLane) || (teamPosition != types.TeamPositionJungle && onlyForJungle) {
-				except = true
-			}
-			if teamPosition != types.TeamPositionSupport && forVision && !forConsumable {
-				except = true
-			}
-			if isAdType != isApType {
-				// AD/AP 구분이 확실한 경우에만 필터링
-				if (isAdType && onlyForAp) || (isApType && onlyForAd) {
-					except = true
-				}
-			}
-
-			if !except {
-				positionLowDepthItemRecommendations[itemId] = item
-			}
+		positionItemCounts := getDescSortedPositionItemCounts(positionItems)
+		positionItemTags := getPositionItemTags(positionItems)
+		lowDepthItemRecommends, err := getLowDepthItemRecommendations(championId, teamPosition, positionItemTags)
+		if err != nil {
+			log.Error(err)
+			return nil, err
 		}
 
 		metaGroup := make(MetaGroup, 0)
 		for _, metaMXDAO := range metaMXDAOs {
-			items := []*int{
+			majorItems := getValidItems([]*int{
 				&metaMXDAO.Item0Id,
 				&metaMXDAO.Item1Id,
 				&metaMXDAO.Item2Id,
 				metaMXDAO.Item3Id,
 				metaMXDAO.Item4Id,
 				metaMXDAO.Item5Id,
-			}
-			validItems := make([]int, 0)
-			for _, item := range items {
-				if item != nil {
-					validItems = append(validItems, *item)
-				}
-			}
-			majorItems := make([]int, 0)
-			for _, itemId := range validItems {
-				_, exists := service.Items[itemId]
-				if !exists {
-					log.Errorf("item not found: %d", itemId)
-					continue
-				}
-				majorItems = append(majorItems, itemId)
-			}
+			})
 
 			// get categories of tags from major items
 			tagCategories := make(map[string]int)
@@ -549,70 +539,20 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 				}
 			}
 
-			// gold sorters
-			descSorter := func(i, j int) bool {
-				itemI, existsI := positionLowDepthItemRecommendations[i]
-				itemJ, existsJ := positionLowDepthItemRecommendations[j]
-				if !existsI || !existsJ {
-					return false
-				}
-				return itemI.Gold.Total > itemJ.Gold.Total
+			startItems, basicItems, subItems, err := getItemTrees(positionItemCounts, lowDepthItemRecommends, majorItems)
+			if err != nil {
+				log.Error(err)
+				return nil, err
 			}
-			ascSorter := func(i, j int) bool {
-				itemI, existsI := positionLowDepthItemRecommendations[i]
-				itemJ, existsJ := positionLowDepthItemRecommendations[j]
-				if !existsI || !existsJ {
-					return false
-				}
-				return itemI.Gold.Total < itemJ.Gold.Total
-			}
-
-			// collect start, basic items
-			startItems := make([]int, 0)
-			for itemId, item := range positionLowDepthItemRecommendations {
-				if item.Gold.Total < 500 && item.Into == nil {
-					startItems = append(startItems, itemId)
-				}
-			}
-			basicItems := make([]int, 0)
-			basicItemMap := make(map[int]bool)
-			for _, itemId := range majorItems {
-				depth1Items, err := GetDepth1Items(itemId)
-				if err != nil {
-					log.Error(err)
-					return nil, err
-				}
-				for _, depth1Item := range depth1Items {
-					basicItemMap[depth1Item] = true
-				}
-			}
-			for itemId, _ := range basicItemMap {
-				basicItems = append(basicItems, itemId)
-			}
-
-			// collect sub items
-			subItems := make([]int, 0)
-			for _, itemCount := range positionItemCounts {
-				foundInThisMeta := false
-				for _, itemId := range validItems {
-					if itemId == itemCount.itemId {
-						foundInThisMeta = true
-						break
-					}
-				}
-				if !foundInThisMeta {
-					subItems = append(subItems, itemCount.itemId)
-				}
-			}
-			sort.SliceStable(startItems, descSorter)
-			sort.SliceStable(basicItems, ascSorter)
-			sort.SliceStable(subItems, descSorter)
 
 			uuid := uuid2.New()
 			pickRate := 0.0
 			if pickCount > 0 {
 				pickRate = float64(metaMXDAO.Total) / float64(pickCount)
 			}
+			item0Id := metaMXDAO.Item0Id
+			item1Id := metaMXDAO.Item1Id
+			item2Id := metaMXDAO.Item2Id
 			metaPick := MetaPick{
 				Id:                uuid.String(),
 				Summoner1Id:       metaMXDAO.Summoner1Id,
@@ -628,9 +568,9 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 				StatPerkDefenseId: metaMXDAO.StatPerkDefense,
 				StatPerkFlexId:    metaMXDAO.StatPerkFlex,
 				StatPerkOffenseId: metaMXDAO.StatPerkOffense,
-				Item0:             metaMXDAO.Item0Id,
-				Item1:             metaMXDAO.Item1Id,
-				Item2:             metaMXDAO.Item2Id,
+				Item0:             &item0Id,
+				Item1:             &item1Id,
+				Item2:             &item2Id,
 				Item3:             metaMXDAO.Item3Id,
 				Item4:             metaMXDAO.Item4Id,
 				Item5:             metaMXDAO.Item5Id,
@@ -744,12 +684,105 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 			}
 		}
 
+		counterMap := make(map[int]ChampionCounterStatistics)
+		counters, exists := countersByPositionMap[teamPosition]
+		if !exists {
+			counters = make(map[int]statistics_models.ChampionCounterStatisticsMXDAO)
+		}
+		for counterChampionId, counterInfo := range counters {
+			counterChampion, exists := service.Champions[strconv.Itoa(counterInfo.EnemyChampionId)]
+			if !exists {
+				log.Warnf("champion not found: %d", counterInfo.EnemyChampionId)
+				continue
+			}
+
+			majorItems := getValidItems([]*int{
+				counterInfo.Item0Id,
+				counterInfo.Item1Id,
+				counterInfo.Item2Id,
+				counterInfo.Item3Id,
+				counterInfo.Item4Id,
+				counterInfo.Item5Id,
+			})
+			startItems, basicItems, subItems, err := getItemTrees(positionItemCounts, lowDepthItemRecommends, majorItems)
+			if err != nil {
+				log.Error(err)
+				return nil, err
+			}
+
+			metaPick := MetaPick{
+				Id:                uuid2.New().String(),
+				Summoner1Id:       counterInfo.Summoner1Id,
+				Summoner2Id:       counterInfo.Summoner2Id,
+				PrimaryStyleId:    counterInfo.PrimaryStyle,
+				PrimaryPerk0:      counterInfo.PrimaryPerk0,
+				PrimaryPerk1:      counterInfo.PrimaryPerk1,
+				PrimaryPerk2:      counterInfo.PrimaryPerk2,
+				PrimaryPerk3:      counterInfo.PrimaryPerk3,
+				SubStyleId:        counterInfo.SubStyle,
+				SubPerk0:          counterInfo.SubPerk0,
+				SubPerk1:          counterInfo.SubPerk1,
+				StatPerkDefenseId: counterInfo.StatPerkDefense,
+				StatPerkFlexId:    counterInfo.StatPerkFlex,
+				StatPerkOffenseId: counterInfo.StatPerkOffense,
+				Item0:             counterInfo.Item0Id,
+				Item1:             counterInfo.Item1Id,
+				Item2:             counterInfo.Item2Id,
+				Item3:             counterInfo.Item3Id,
+				Item4:             counterInfo.Item4Id,
+				Item5:             counterInfo.Item5Id,
+				Wins:              counterInfo.Wins,
+				Total:             counterInfo.Total,
+				WinRate:           counterInfo.WinRate,
+				PickRate:          0,
+				MetaRank:          0,
+				MajorTag:          "",
+				MinorTag:          nil,
+				StartItems:        startItems,
+				BasicItems:        basicItems,
+				SubItems:          subItems,
+			}
+			realMeta, err := metaPick.toRealMeta()
+			if err != nil {
+				log.Error(err)
+				return nil, err
+			}
+
+			counterMap[counterChampionId] = ChampionCounterStatistics{
+				CounterChampionId:   counterInfo.EnemyChampionId,
+				CounterChampionName: counterChampion.Name,
+				AvgKills:            counterInfo.AvgKills,
+				AvgDeaths:           counterInfo.AvgDeaths,
+				AvgAssists:          counterInfo.AvgAssists,
+				CounterAvgKills:     counterInfo.EnemyAvgKills,
+				CounterAvgDeaths:    counterInfo.EnemyAvgDeaths,
+				CounterAvgAssists:   counterInfo.EnemyAvgAssists,
+				Summoner1Id:         counterInfo.Summoner1Id,
+				Summoner2Id:         counterInfo.Summoner2Id,
+				MajorPerkGroup:      realMeta.MajorPerkGroup,
+				MinorPerkGroup:      realMeta.MinorPerkGroup,
+				PerkExtra:           realMeta.PerkExtra,
+				MainSlots:           realMeta.MainSlots,
+				SubSlots:            realMeta.SubSlots,
+				StatSlots:           realMeta.StatSlots,
+				StartItemTree:       realMeta.StartItemTree,
+				BasicItemTree:       realMeta.BasicItemTree,
+				ItemTree:            realMeta.ItemTree,
+				SubItemTree:         realMeta.SubItemTree,
+				Count:               counterInfo.Total,
+				Win:                 counterInfo.Wins,
+				WinRate:             counterInfo.WinRate,
+				ExpectedWinRate:     counterInfo.TotalWinRate,
+			}
+		}
+
 		metaTree := ChampionDetailStatisticsMetaTree{
 			MajorMetaPicks: make([]ChampionDetailStatisticsMeta, 0),
 			MinorMetaPicks: make([]ChampionDetailStatisticsMeta, 0),
 			MetaPicks:      make([]ChampionDetailStatisticsMeta, 0),
 			PickCount:      pickCount,
 			WinCount:       winCount,
+			CounterMap:     counterMap,
 		}
 		for _, metaPick := range majorMetaPicks {
 			meta, err := metaPick.toRealMeta()
@@ -783,7 +816,7 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 		} else if teamPosition == types.TeamPositionMid {
 			metaTrees.Mid = &metaTree
 		} else if teamPosition == types.TeamPositionAdc {
-			metaTrees.ADC = &metaTree
+			metaTrees.Adc = &metaTree
 		} else if teamPosition == types.TeamPositionSupport {
 			metaTrees.Support = &metaTree
 		} else {

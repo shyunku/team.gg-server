@@ -27,3 +27,9 @@ type GetChampionStatisticsResponseDto struct {
 type GetChampionStatisticsDetailRequestDto struct {
 	ChampionId int `form:"championId" binding:"required"`
 }
+
+type GetCounterStatisticsRequestDto struct {
+	ChampionId        int    `form:"championId" binding:"required"`
+	TeamPosition      string `form:"teamPosition" binding:"required"`
+	CounterChampionId int    `form:"counterChampionId" binding:"required"`
+}

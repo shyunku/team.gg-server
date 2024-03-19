@@ -18,7 +18,7 @@ const (
 	DataExplorerLoopPeriodDev    = 365 * 24 * time.Hour
 	DataExplorerLoadMatchesCount = 3
 
-	SummonerRankingRevisionPeriod = 24 * time.Hour
+	SummonerRankingRevisionPeriod = 7 * 24 * time.Hour
 
 	PositionTop     = "TOP"
 	PositionJungle  = "JUNGLE"

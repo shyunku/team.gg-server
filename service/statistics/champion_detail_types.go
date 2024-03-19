@@ -26,9 +26,9 @@ type MetaPick struct {
 	StatPerkFlexId    int
 	StatPerkOffenseId int
 
-	Item0    int
-	Item1    int
-	Item2    int
+	Item0    *int
+	Item1    *int
+	Item2    *int
 	Item3    *int
 	Item4    *int
 	Item5    *int
@@ -47,17 +47,17 @@ type MetaPick struct {
 
 func (m *MetaPick) toRealMeta() (*ChampionDetailStatisticsMeta, error) {
 	items := []*int{
-		&m.Item0,
-		&m.Item1,
-		&m.Item2,
+		m.Item0,
+		m.Item1,
+		m.Item2,
 		m.Item3,
 		m.Item4,
 		m.Item5,
 	}
 	validItems := make([]int, 0)
-	for _, item := range items {
-		if item != nil {
-			validItems = append(validItems, *item)
+	for _, itemId := range items {
+		if itemId != nil {
+			validItems = append(validItems, *itemId)
 		}
 	}
 
@@ -140,12 +140,4 @@ func (mg *MetaGroup) getTotalPickCount() int {
 		totalPickCount += metaPick.Total
 	}
 	return totalPickCount
-}
-
-func (mg *MetaGroup) getTotalPickRate() float64 {
-	totalPickRate := 0.0
-	for _, metaPick := range *mg {
-		totalPickRate += metaPick.PickRate
-	}
-	return totalPickRate
 }
