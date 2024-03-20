@@ -224,7 +224,7 @@ type ChampionStatisticVO struct {
 
 type ChampionDataVO struct {
 	Version string `json:"version"`
-	Id      string `json:"id"`
+	Id      string `json:"id"` // 챔피언 아이디 (ex. Aatrox)
 	Key     string `json:"key"`
 	Name    string `json:"name"`
 	Title   string `json:"title"` // 챔피언 컨셉 (ex. 아트록스: 다르킨의 검)

@@ -8,6 +8,17 @@ import (
 	"team.gg-server/util"
 )
 
+func LoadDDragonCentralImageFile(relativePath string) ([]byte, error) {
+	path := fmt.Sprintf("%s/datafiles/data_dragon/%s/img%s",
+		util.GetProjectRootDirectory(), LocalDataDragonVersion, relativePath)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
 func LoadDDragonImageFile(relativePath string) ([]byte, error) {
 	path := fmt.Sprintf("%s/datafiles/data_dragon/%s/%s/img%s",
 		util.GetProjectRootDirectory(), LocalDataDragonVersion, LocalDataDragonVersion, relativePath)

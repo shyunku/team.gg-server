@@ -13,6 +13,7 @@ func UseIconRouter(r *gin.RouterGroup) {
 	g := r.Group("/icon")
 
 	g.GET("/champion", GetChampionIcon)
+	g.GET("/centered-splash-champion", GetCenteredSplashChampion)
 	g.GET("/profile", GetProfileIcon)
 	g.GET("/summonerSpell", GetSummonerSpellIcon)
 	g.GET("/item", GetItemIcon)
@@ -39,6 +40,35 @@ func GetChampionIcon(c *gin.Context) {
 	championId := champion.Id
 	championIconUrl := "https://ddragon.leagueoflegends.com/cdn/" + service.DataDragonVersion + "/img/champion/" + championId + ".png"
 	c.Redirect(http.StatusMovedPermanently, championIconUrl)
+}
+
+type GetCenteredSplashChampionRequest struct {
+	Key string `form:"key" binding:"required"`
+}
+
+func GetCenteredSplashChampion(c *gin.Context) {
+	var req GetCenteredSplashChampionRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	champion, ok := service.Champions[req.Key]
+	if !ok {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid champion key")
+		return
+	}
+
+	imgBytes, err := service.LoadDDragonCentralImageFile("/champion/centered/" + champion.Id + "_0.jpg")
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.Header("Cache-Control", "public, max-age=31536000")
+	c.Data(http.StatusOK, "image/png", imgBytes)
 }
 
 type GetProfileIconRequest struct {

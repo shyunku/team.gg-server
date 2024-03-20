@@ -49,6 +49,9 @@ func getMatchGameVersionMXDAOs_byDescendingVersion(db db.Context) ([]MatchGameVe
 }
 
 func GetRecentMatchGameVersions_byDescendingShortVersion_withCount(db db.Context, count int) ([]string, []string, error) {
+	if count == -1 {
+		count = 100000
+	}
 	matchGameVersionMXDAOs, err := getMatchGameVersionMXDAOs_byDescendingVersion(db)
 	if err != nil {
 		return nil, nil, err

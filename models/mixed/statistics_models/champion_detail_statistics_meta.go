@@ -70,7 +70,12 @@ func CreateTemporaryTables(db db.Context, matchGameVersions []string) error {
 			  AND pc.primary_style IS NOT NULL
 			  AND pc.sub_style IS NOT NULL
 			  AND pc.primary_style != 0
+		  	  AND pc.primary_perk1 IS NOT NULL
+			  AND pc.primary_perk2 IS NOT NULL
+			  AND pc.primary_perk3 IS NOT NULL
 			  AND pc.sub_style != 0
+			  AND pc.sub_perk0 IS NOT NULL
+			  AND pc.sub_perk1 IS NOT NULL
     		  AND m.game_version IN ('` + strings.Join(matchGameVersions, `', '`) + `');`,
 		`CREATE TEMPORARY TABLE IF NOT EXISTS MainGroup AS
 			SELECT match_id, match_participant_id, champion_id, champion_name, team_position,

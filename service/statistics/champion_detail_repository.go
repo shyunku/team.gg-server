@@ -203,7 +203,8 @@ func (cdsr *ChampionDetailStatisticsRepository) Collect() (*ChampionDetailStatis
 	timer.Start()
 
 	// collect recent versions
-	recentMatchGameVersions, recentMatchGameShortVersions, err := mixed.GetRecentMatchGameVersions_byDescendingShortVersion_withCount(StatisticsDB, 2)
+	versionCount := 4
+	recentMatchGameVersions, recentMatchGameShortVersions, err := mixed.GetRecentMatchGameVersions_byDescendingShortVersion_withCount(StatisticsDB, versionCount)
 	if err != nil {
 		log.Error(err)
 		return nil, err
