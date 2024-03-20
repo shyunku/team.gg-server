@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"encoding/json"
+	"fmt"
 	uuid2 "github.com/google/uuid"
 	log "github.com/shyunku-libraries/go-logger"
 	"os"
@@ -86,9 +87,9 @@ type ChampionCounterStatistics struct {
 	Summoner1Id int `json:"summoner1Id"`
 	Summoner2Id int `json:"summoner2Id"`
 
-	MajorPerkGroup PerkGroup `json:"majorPerkGroup"` // 메인 룬 추천
-	MinorPerkGroup PerkGroup `json:"minorPerkGroup"` // Sub 룬 추천
-	PerkExtra      PerkExtra `json:"perkExtra"`      // 메인 룬 스탯 추천
+	MajorPerkGroup *PerkGroup `json:"majorPerkGroup"` // 메인 룬 추천
+	MinorPerkGroup *PerkGroup `json:"minorPerkGroup"` // Sub 룬 추천
+	PerkExtra      *PerkExtra `json:"perkExtra"`      // 메인 룬 스탯 추천
 
 	MainSlots []PerkSlot `json:"mainSlots"` // 메인 룬 Placeholders
 	SubSlots  []PerkSlot `json:"subSlots"`  // Sub 룬 Placeholders
@@ -104,6 +105,8 @@ type ChampionCounterStatistics struct {
 
 	WinRate         float64  `json:"winRate"`
 	ExpectedWinRate *float64 `json:"expectedWinRate"` // 해당 룬/아이템 조합의 기대 승률
+
+	IsValid bool `json:"isValid"`
 }
 
 type ChampionDetailStatisticsMetaTree struct {
@@ -689,91 +692,129 @@ func (cdsr *ChampionDetailStatisticsRepository) collectEachChampionMetas(
 		if !exists {
 			counters = make(map[int]statistics_models.ChampionCounterStatisticsMXDAO)
 		}
-		for counterChampionId, counterInfo := range counters {
-			counterChampion, exists := service.Champions[strconv.Itoa(counterInfo.EnemyChampionId)]
+		for counterChampionId, counter := range counters {
+			counterChampion, exists := service.Champions[strconv.Itoa(counter.EnemyChampionId)]
 			if !exists {
-				log.Warnf("champion not found: %d", counterInfo.EnemyChampionId)
+				log.Warnf("champion not found: %d", counter.EnemyChampionId)
 				continue
 			}
 
 			majorItems := getValidItems([]*int{
-				counterInfo.Item0Id,
-				counterInfo.Item1Id,
-				counterInfo.Item2Id,
-				counterInfo.Item3Id,
-				counterInfo.Item4Id,
-				counterInfo.Item5Id,
+				counter.Item0Id,
+				counter.Item1Id,
+				counter.Item2Id,
+				counter.Item3Id,
+				counter.Item4Id,
+				counter.Item5Id,
 			})
+
+			if len(majorItems) < 3 {
+				lack := 3 - len(majorItems)
+				for i := 0; i < lack && i < len(positionItemCounts); i++ {
+					majorItems = append(majorItems, positionItemCounts[i].itemId)
+				}
+			}
+
 			startItems, basicItems, subItems, err := getItemTrees(positionItemCounts, lowDepthItemRecommends, majorItems)
 			if err != nil {
 				log.Error(err)
 				return nil, err
 			}
 
-			metaPick := MetaPick{
-				Id:                uuid2.New().String(),
-				Summoner1Id:       counterInfo.Summoner1Id,
-				Summoner2Id:       counterInfo.Summoner2Id,
-				PrimaryStyleId:    counterInfo.PrimaryStyle,
-				PrimaryPerk0:      counterInfo.PrimaryPerk0,
-				PrimaryPerk1:      counterInfo.PrimaryPerk1,
-				PrimaryPerk2:      counterInfo.PrimaryPerk2,
-				PrimaryPerk3:      counterInfo.PrimaryPerk3,
-				SubStyleId:        counterInfo.SubStyle,
-				SubPerk0:          counterInfo.SubPerk0,
-				SubPerk1:          counterInfo.SubPerk1,
-				StatPerkDefenseId: counterInfo.StatPerkDefense,
-				StatPerkFlexId:    counterInfo.StatPerkFlex,
-				StatPerkOffenseId: counterInfo.StatPerkOffense,
-				Item0:             counterInfo.Item0Id,
-				Item1:             counterInfo.Item1Id,
-				Item2:             counterInfo.Item2Id,
-				Item3:             counterInfo.Item3Id,
-				Item4:             counterInfo.Item4Id,
-				Item5:             counterInfo.Item5Id,
-				Wins:              counterInfo.Wins,
-				Total:             counterInfo.Total,
-				WinRate:           counterInfo.WinRate,
-				PickRate:          0,
-				MetaRank:          0,
-				MajorTag:          "",
-				MinorTag:          nil,
-				StartItems:        startItems,
-				BasicItems:        basicItems,
-				SubItems:          subItems,
-			}
-			realMeta, err := metaPick.toRealMeta()
-			if err != nil {
-				log.Error(err)
-				return nil, err
+			c := ChampionCounterStatistics{
+				CounterChampionId:   counter.EnemyChampionId,
+				CounterChampionName: counterChampion.Name,
+				AvgKills:            counter.AvgKills,
+				AvgDeaths:           counter.AvgDeaths,
+				AvgAssists:          counter.AvgAssists,
+				CounterAvgKills:     counter.EnemyAvgKills,
+				CounterAvgDeaths:    counter.EnemyAvgDeaths,
+				CounterAvgAssists:   counter.EnemyAvgAssists,
+				Summoner1Id:         counter.Summoner1Id,
+				Summoner2Id:         counter.Summoner2Id,
+				MajorPerkGroup:      nil,
+				MinorPerkGroup:      nil,
+				PerkExtra:           nil,
+				MainSlots:           make([]PerkSlot, 0),
+				SubSlots:            make([]PerkSlot, 0),
+				StatSlots:           make([]PerkSlot, 0),
+				StartItemTree:       startItems,
+				BasicItemTree:       basicItems,
+				ItemTree:            majorItems,
+				SubItemTree:         subItems,
+				Count:               counter.Total,
+				Win:                 counter.Wins,
+				WinRate:             counter.WinRate,
+				ExpectedWinRate:     counter.TotalWinRate,
+				IsValid:             true,
 			}
 
-			counterMap[counterChampionId] = ChampionCounterStatistics{
-				CounterChampionId:   counterInfo.EnemyChampionId,
-				CounterChampionName: counterChampion.Name,
-				AvgKills:            counterInfo.AvgKills,
-				AvgDeaths:           counterInfo.AvgDeaths,
-				AvgAssists:          counterInfo.AvgAssists,
-				CounterAvgKills:     counterInfo.EnemyAvgKills,
-				CounterAvgDeaths:    counterInfo.EnemyAvgDeaths,
-				CounterAvgAssists:   counterInfo.EnemyAvgAssists,
-				Summoner1Id:         counterInfo.Summoner1Id,
-				Summoner2Id:         counterInfo.Summoner2Id,
-				MajorPerkGroup:      realMeta.MajorPerkGroup,
-				MinorPerkGroup:      realMeta.MinorPerkGroup,
-				PerkExtra:           realMeta.PerkExtra,
-				MainSlots:           realMeta.MainSlots,
-				SubSlots:            realMeta.SubSlots,
-				StatSlots:           realMeta.StatSlots,
-				StartItemTree:       realMeta.StartItemTree,
-				BasicItemTree:       realMeta.BasicItemTree,
-				ItemTree:            realMeta.ItemTree,
-				SubItemTree:         realMeta.SubItemTree,
-				Count:               counterInfo.Total,
-				Win:                 counterInfo.Wins,
-				WinRate:             counterInfo.WinRate,
-				ExpectedWinRate:     counterInfo.TotalWinRate,
+			if counter.PrimaryStyle != nil {
+				primaryPerkStyle, ok := service.PerkStyles[*counter.PrimaryStyle]
+				if !ok {
+					return nil, fmt.Errorf("primary perk style not found: %d", *counter.PrimaryStyle)
+				}
+				primaryPerks := make([]int, 0)
+				for _, subPerk := range []*int{counter.PrimaryPerk0, counter.PrimaryPerk1, counter.PrimaryPerk2, counter.PrimaryPerk3} {
+					if subPerk != nil {
+						primaryPerks = append(primaryPerks, *subPerk)
+					}
+				}
+				c.MajorPerkGroup = &PerkGroup{
+					PerkStyleName: primaryPerkStyle.Name,
+					PerkStyleId:   *counter.PrimaryStyle,
+					SubPerks:      primaryPerks,
+				}
+			} else {
+				c.IsValid = false
 			}
+
+			if counter.SubStyle != nil {
+				subPerkStyle, ok := service.PerkStyles[*counter.SubStyle]
+				if !ok {
+					return nil, fmt.Errorf("sub perk style not found: %d", *counter.SubStyle)
+				}
+				subPerks := make([]int, 0)
+				for _, subPerk := range []*int{counter.SubPerk0, counter.SubPerk1} {
+					if subPerk != nil {
+						subPerks = append(subPerks, *subPerk)
+					}
+				}
+				c.MinorPerkGroup = &PerkGroup{
+					PerkStyleName: subPerkStyle.Name,
+					PerkStyleId:   *counter.SubStyle,
+					SubPerks:      subPerks,
+				}
+			} else {
+				c.IsValid = false
+			}
+
+			if counter.PrimaryStyle != nil && counter.SubStyle != nil {
+				mainSlots, subSlots, statSlots, err := getSlotsFromStyle(*counter.PrimaryStyle, *counter.SubStyle)
+				if err != nil {
+					return nil, err
+				}
+
+				c.MainSlots = mainSlots
+				c.SubSlots = subSlots
+				c.StatSlots = statSlots
+			}
+
+			if counter.StatPerkDefense != nil && counter.StatPerkFlex != nil && counter.StatPerkOffense != nil {
+				c.PerkExtra = &PerkExtra{
+					StatDefenseId: *counter.StatPerkDefense,
+					StatFlexId:    *counter.StatPerkFlex,
+					StatOffenseId: *counter.StatPerkOffense,
+				}
+			} else {
+				c.IsValid = false
+			}
+
+			if counter.EnemyWinRate == nil {
+				c.IsValid = false
+			}
+
+			counterMap[counterChampionId] = c
 		}
 
 		metaTree := ChampionDetailStatisticsMetaTree{

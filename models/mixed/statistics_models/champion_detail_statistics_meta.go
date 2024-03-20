@@ -412,17 +412,17 @@ type ChampionCounterStatisticsMXDAO struct {
 	Summoner1Id int `db:"summoner1_id" json:"summoner1Id"`
 	Summoner2Id int `db:"summoner2_id" json:"summoner2Id"`
 
-	PrimaryStyle    int `db:"primary_style" json:"primaryStyle"`
-	PrimaryPerk0    int `db:"primary_perk0" json:"primaryPerk0"`
-	PrimaryPerk1    int `db:"primary_perk1" json:"primaryPerk1"`
-	PrimaryPerk2    int `db:"primary_perk2" json:"primaryPerk2"`
-	PrimaryPerk3    int `db:"primary_perk3" json:"primaryPerk3"`
-	SubStyle        int `db:"sub_style" json:"subStyle"`
-	SubPerk0        int `db:"sub_perk0" json:"subPerk0"`
-	SubPerk1        int `db:"sub_perk1" json:"subPerk1"`
-	StatPerkDefense int `db:"stat_perk_defense" json:"statPerkDefense"`
-	StatPerkFlex    int `db:"stat_perk_flex" json:"statPerkFlex"`
-	StatPerkOffense int `db:"stat_perk_offense" json:"statPerkOffense"`
+	PrimaryStyle    *int `db:"primary_style" json:"primaryStyle"`
+	PrimaryPerk0    *int `db:"primary_perk0" json:"primaryPerk0"`
+	PrimaryPerk1    *int `db:"primary_perk1" json:"primaryPerk1"`
+	PrimaryPerk2    *int `db:"primary_perk2" json:"primaryPerk2"`
+	PrimaryPerk3    *int `db:"primary_perk3" json:"primaryPerk3"`
+	SubStyle        *int `db:"sub_style" json:"subStyle"`
+	SubPerk0        *int `db:"sub_perk0" json:"subPerk0"`
+	SubPerk1        *int `db:"sub_perk1" json:"subPerk1"`
+	StatPerkDefense *int `db:"stat_perk_defense" json:"statPerkDefense"`
+	StatPerkFlex    *int `db:"stat_perk_flex" json:"statPerkFlex"`
+	StatPerkOffense *int `db:"stat_perk_offense" json:"statPerkOffense"`
 
 	Item0Id *int `db:"item0_id" json:"item0Id"`
 	Item1Id *int `db:"item1_id" json:"item1Id"`

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	uuid2 "github.com/google/uuid"
 	"team.gg-server/service"
-	"team.gg-server/types"
 )
 
 type MetaPick struct {
@@ -61,6 +60,11 @@ func (m *MetaPick) toRealMeta() (*ChampionDetailStatisticsMeta, error) {
 		}
 	}
 
+	mainSlots, subSlots, statSlots, err := getSlotsFromStyle(m.PrimaryStyleId, m.SubStyleId)
+	if err != nil {
+		return nil, err
+	}
+
 	primaryPerkStyle, ok := service.PerkStyles[m.PrimaryStyleId]
 	if !ok {
 		return nil, fmt.Errorf("primary perk style not found: %d", m.PrimaryStyleId)
@@ -68,22 +72,6 @@ func (m *MetaPick) toRealMeta() (*ChampionDetailStatisticsMeta, error) {
 	subPerkStyle, ok := service.PerkStyles[m.SubStyleId]
 	if !ok {
 		return nil, fmt.Errorf("sub perk style not found: %d", m.SubStyleId)
-	}
-
-	mainSlots := make([]PerkSlot, 0)
-	subSlots := make([]PerkSlot, 0)
-	statSlots := make([]PerkSlot, 0)
-	for _, slot := range primaryPerkStyle.Slots {
-		if slot.Type == types.PerkSlotTypeStatMod {
-			statSlots = append(statSlots, slot)
-		} else {
-			mainSlots = append(mainSlots, slot)
-		}
-	}
-	for _, slot := range subPerkStyle.Slots {
-		if slot.Type != types.PerkSlotTypeStatMod && slot.Type != types.PerkSlotTypeKeystone {
-			subSlots = append(subSlots, slot)
-		}
 	}
 
 	uuid := uuid2.New()

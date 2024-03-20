@@ -110,8 +110,9 @@ func getValidItems(itemIdList []*int) []int {
 		if itemId == nil {
 			continue
 		}
-		if _, exists := service.Items[*itemId]; exists {
-			validItems = append(validItems, *itemId)
+		copied := *itemId
+		if _, exists := service.Items[copied]; exists {
+			validItems = append(validItems, copied)
 		}
 	}
 	return validItems
@@ -250,4 +251,33 @@ func getItemTrees(
 	sort.SliceStable(subItems, descSorter)
 
 	return startItems, basicItems, subItems, nil
+}
+
+func getSlotsFromStyle(primaryStyleId, subStyleId int) ([]PerkSlot, []PerkSlot, []PerkSlot, error) {
+	primaryPerkStyle, ok := service.PerkStyles[primaryStyleId]
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("primary perk style not found: %d", primaryStyleId)
+	}
+	subPerkStyle, ok := service.PerkStyles[subStyleId]
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("sub perk style not found: %d", subStyleId)
+	}
+
+	mainSlots := make([]PerkSlot, 0)
+	subSlots := make([]PerkSlot, 0)
+	statSlots := make([]PerkSlot, 0)
+	for _, slot := range primaryPerkStyle.Slots {
+		if slot.Type == types.PerkSlotTypeStatMod {
+			statSlots = append(statSlots, slot)
+		} else {
+			mainSlots = append(mainSlots, slot)
+		}
+	}
+	for _, slot := range subPerkStyle.Slots {
+		if slot.Type != types.PerkSlotTypeStatMod && slot.Type != types.PerkSlotTypeKeystone {
+			subSlots = append(subSlots, slot)
+		}
+	}
+
+	return mainSlots, subSlots, statSlots, nil
 }
