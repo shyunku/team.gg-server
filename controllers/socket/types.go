@@ -2,7 +2,6 @@ package socket
 
 import (
 	socketio "github.com/googollee/go-socket.io"
-	log "github.com/shyunku-libraries/go-logger"
 	"team.gg-server/models"
 )
 
@@ -81,7 +80,7 @@ func (sm *Manager) MulticastToCustomConfigRoom(configId string, exceptUid string
 	}
 	exceptSocket, ok := sm.GetUserByUserId(exceptUid)
 	if !ok {
-		log.Debugf("configId: %s, exceptUid: %s, event: %s, data: %v", configId, exceptUid, event, data)
+		//log.Debugf("configId: %s, exceptUid: %s, event: %s, data: %v", configId, exceptUid, event, data)
 		sm.BroadcastToCustomConfigRoom(configId, event, data)
 	} else {
 		roomKey := RoomKey(configId)
@@ -127,4 +126,6 @@ const (
 type CustomConfigOptimizeProcessData struct {
 	Type     string  `json:"type"`
 	Progress float64 `json:"progress"`
+	Current  int64   `json:"current"`
+	Total    int64   `json:"total"`
 }

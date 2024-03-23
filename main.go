@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.5.5"
+const VERSION = "0.5.6"
 
 func main() {
 	fmt.Println(`
@@ -116,12 +116,12 @@ func main() {
 	de := service.NewDataExplorer()
 	go de.Loop()
 
-	// initialize statistics_models repository
-	log.Info("Initializing statistics_models repository...")
+	// initialize statistics repository
+	log.Info("Initializing statistics repository...")
 	statistics.InitializeStatisticRepos()
 
-	// start statistics_models repository loop
-	log.Info("Starting statistics_models repository loops...")
+	// start statistics repository loop
+	log.Info("Starting statistics repository loops...")
 	go statistics.ChampionDetailStatisticsRepo.Loop()
 	go statistics.TierStatisticsRepo.Loop()
 	go statistics.MasteryStatisticsRepo.Loop()

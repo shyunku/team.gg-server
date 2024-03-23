@@ -399,6 +399,7 @@ type CustomGameCandidateVO struct {
 	CustomRank    *SummonerRankVO                    `json:"customRank"`
 	PositionFavor CustomGameCandidatePositionFavorVO `json:"positionFavor"`
 	Mastery       []SummonerMasteryVO                `json:"mastery"`
+	ColorCode     int                                `json:"colorCode"`
 }
 
 func (c *CustomGameCandidateVO) GetRepresentativeRank() *SummonerRankVO {

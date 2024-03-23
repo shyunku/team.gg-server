@@ -412,6 +412,17 @@ func GetCustomGameConfigurationVO(configurationId string) (*CustomGameConfigurat
 	team1ParticipantsVOs := make([]CustomGameParticipantVO, 0)
 	team2ParticipantsVOs := make([]CustomGameParticipantVO, 0)
 
+	// get participant color code
+	participantColorLabelDAOs, err := models.GetCustomGameParticipantColorLabelDAOs_byCustomGameConfigId(db.Root, configurationId)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	colorLabels := make(map[string]int)
+	for _, participantColorLabelDAO := range participantColorLabelDAOs {
+		colorLabels[participantColorLabelDAO.Puuid] = participantColorLabelDAO.ColorCode
+	}
+
 	// get candidates
 	candidateDAOs, err := models.GetCustomGameCandidateDAOs_byCustomGameConfigId(db.Root, configurationId)
 	if err != nil {
@@ -419,12 +430,25 @@ func GetCustomGameConfigurationVO(configurationId string) (*CustomGameConfigurat
 		return nil, err
 	}
 	for _, candidateDAO := range candidateDAOs {
+		colorCode, exists := colorLabels[candidateDAO.Puuid]
+		if !exists {
+			colorCode = 0
+		}
+
 		summonerVO, err := GetCustomGameCandidateVO(candidateDAO)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
-		candidateVOs = append(candidateVOs, *summonerVO)
+		candidateVOs = append(candidateVOs, CustomGameCandidateVO{
+			Summary:       summonerVO.Summary,
+			SoloRank:      summonerVO.SoloRank,
+			FlexRank:      summonerVO.FlexRank,
+			CustomRank:    summonerVO.CustomRank,
+			PositionFavor: summonerVO.PositionFavor,
+			Mastery:       summonerVO.Mastery,
+			ColorCode:     colorCode,
+		})
 	}
 
 	// get participants

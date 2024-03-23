@@ -7,6 +7,7 @@ import (
 	log "github.com/shyunku-libraries/go-logger"
 	"math/rand"
 	"net/http"
+	"sort"
 	"team.gg-server/controllers/socket"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
@@ -34,6 +35,8 @@ func UseCustomGameRouter(r *gin.RouterGroup) {
 	g.POST("/unarrange", UnarrangeCustomGameParticipant)
 	g.POST("/favor-position", SetCustomGameParticipantFavorPosition)
 	g.POST("/custom-tier-rank", SetCustomGameCandidateCustomTierRank)
+	g.POST("/custom-color-label", SetCustomGameCandidateCustomColorLabel)
+	g.DELETE("/custom-color-label", DeleteCustomGameCandidateCustomColorLabel)
 	g.POST("/optimize", OptimizeCustomGameConfiguration)
 
 	g.POST("/arrange-all", SelectMaxCandidates)
@@ -544,6 +547,13 @@ func UnarrangeCustomGameParticipant(c *gin.Context) {
 		return
 	}
 
+	if err := models.DeleteCustomGameParticipantColorLabelDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
 	if err := service.RecalculateCustomGameBalance(tx, req.CustomGameConfigId); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
@@ -611,7 +621,7 @@ func SetCustomGameParticipantFavorPosition(c *gin.Context) {
 		return
 	}
 
-	if *req.Strength < 0 || *req.Strength > 2 {
+	if *req.Strength < -1 || *req.Strength > 2 {
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid strength")
 		return
@@ -748,6 +758,249 @@ func SetCustomGameCandidateCustomTierRank(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
+func SetCustomGameCandidateCustomColorLabel(c *gin.Context) {
+	var req SetCustomGameCandidateCustomColorLabelRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.CustomGameConfigId, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// check if candidate exists in config
+	_, exists, err := models.GetCustomGameCandidateDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid)
+	if err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !exists {
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusBadRequest, "candidate not found")
+		return
+	}
+
+	if req.ColorCode == nil {
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid color code")
+		return
+
+	}
+
+	if *req.ColorCode != 0 {
+		// get color labels
+		var myColorDAO *models.CustomGameParticipantColorLabelDAO
+		colorMap := make(map[string]int)
+		colorLabelDAOs, err := models.GetCustomGameParticipantColorLabelDAOs_byCustomGameConfigId(tx, req.CustomGameConfigId)
+		if err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		for _, colorLabelDAO := range colorLabelDAOs {
+			if colorLabelDAO.Puuid == req.Puuid {
+				myColorDAO = &colorLabelDAO
+				colorLabelDAO.ColorCode = *req.ColorCode
+				break
+			}
+		}
+		if myColorDAO == nil {
+			myColorDAO = &models.CustomGameParticipantColorLabelDAO{
+				CustomGameConfigId: req.CustomGameConfigId,
+				Puuid:              req.Puuid,
+				ColorCode:          *req.ColorCode,
+			}
+			colorLabelDAOs = append(colorLabelDAOs, *myColorDAO)
+		}
+		for _, colorLabelDAO := range colorLabelDAOs {
+			if colorLabelDAO.ColorCode != 0 {
+				if _, exists := colorMap[colorLabelDAO.Puuid]; !exists {
+					colorMap[colorLabelDAO.Puuid] = 0
+				}
+				colorMap[colorLabelDAO.Puuid] = colorLabelDAO.ColorCode
+			}
+		}
+
+		// get participants
+		participantDAOs, err := models.GetCustomGameParticipantDAOs_byCustomGameConfigId(tx, req.CustomGameConfigId)
+		if err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		participantColors := make(map[string]int)
+		for _, participantDAO := range participantDAOs {
+			colorCode, exists := colorMap[participantDAO.Puuid]
+			if exists {
+				participantColors[participantDAO.Puuid] = colorCode
+			} else {
+				participantColors[participantDAO.Puuid] = 0
+			}
+		}
+
+		countMap := make(map[int]int)
+		participantWithColor := 0
+		for i := 1; i <= 5; i++ {
+			countMap[i] = 0
+		}
+		for _, colorCode := range participantColors {
+			if colorCode == 0 {
+				continue
+			}
+			countMap[colorCode]++
+			participantWithColor++
+		}
+
+		counts := make([]int, 0)
+		for _, count := range countMap {
+			counts = append(counts, count)
+		}
+
+		sort.SliceStable(counts, func(i, j int) bool {
+			return counts[i] > counts[j]
+		})
+
+		// invalid groups
+		// 2 2 2 2 2
+		// 3 3 3 0 0
+		// 3 3 3 1 0
+		// 4 2 2 2 0
+		// 4 3 3 0 0
+		// 4 4 2 0 0
+
+		// if most count 2 groups has over 5, error
+		if counts[0] >= 6 {
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusConflict, "color code is already used 5 times")
+			return
+		} else if counts[0] == 4 {
+			if counts[1] == 2 && counts[2] == 2 && counts[3] == 2 {
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusNotAcceptable, "color code 4,2,2,2 group is invalid")
+				return
+			} else if counts[1] == 3 && counts[2] == 3 {
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusNotAcceptable, "color code 4,3,3 group is invalid")
+				return
+			} else if counts[1] == 4 && counts[2] == 2 {
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusNotAcceptable, "color code 4,4,2 group is invalid")
+				return
+			}
+		} else if counts[0] == 3 {
+			if counts[1] == 3 && counts[2] == 3 {
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusNotAcceptable, "color code 3,3,3 group is invalid")
+				return
+			}
+		} else if counts[0] == 2 {
+			if counts[1] == 2 && counts[2] == 2 && counts[3] == 2 && counts[4] == 2 {
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusNotAcceptable, "color code 2,2,2,2,2 group is invalid")
+				return
+			}
+		}
+
+		if err := myColorDAO.Upsert(tx); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	} else {
+		// delete
+		if err := models.DeleteCustomGameParticipantColorLabelDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
+func DeleteCustomGameCandidateCustomColorLabel(c *gin.Context) {
+	var req DeleteCustomGameCandidateCustomColorLabelRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	uid := c.GetString("uid")
+
+	// check if user is creator of custom game
+	permitted, err := service.CheckPermissionForCustomGameConfig(db.Root, req.CustomGameConfigId, uid)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !permitted {
+		util.AbortWithStrJson(c, http.StatusForbidden, "user is not creator of custom game")
+		return
+	}
+
+	tx, err := db.Root.BeginTxx(c, nil)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// delete color labels
+	if err := models.DeleteCustomGameParticipantColorLabels_byCustomGameConfigId(tx, req.CustomGameConfigId); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	socket.SocketIO.MulticastToCustomConfigRoom(req.CustomGameConfigId, uid, socket.EventCustomConfigUpdated, nil)
+	c.JSON(http.StatusOK, nil)
+}
+
 func OptimizeCustomGameConfiguration(c *gin.Context) {
 	var req OptimizeCustomGameConfigurationRequestDto
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -824,8 +1077,26 @@ func OptimizeCustomGameConfiguration(c *gin.Context) {
 		return
 	}
 
+	colorLabelDAOs, err := models.GetCustomGameParticipantColorLabelDAOs_byCustomGameConfigId(tx, req.Id)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	colorMap := make(map[string]int)
+	for _, colorLabelDAO := range colorLabelDAOs {
+		if colorLabelDAO.ColorCode == 0 {
+			continue
+		}
+		if _, exists := colorMap[colorLabelDAO.Puuid]; !exists {
+			colorMap[colorLabelDAO.Puuid] = 0
+		}
+		colorMap[colorLabelDAO.Puuid] = colorLabelDAO.ColorCode
+	}
+
 	configWeightsVO := service.CustomGameConfigurationWeightsMixer(*customGameConfigurationDAO)
-	optimizedParticipantVOsMap, err := service.FindBalancedCustomGameConfig(req.Id, participantVOsMap, configWeightsVO)
+	optimizedParticipantVOsMap, err := service.FindBalancedCustomGameConfig(req.Id, participantVOsMap, configWeightsVO, colorMap)
 	if err != nil {
 		log.Error(err)
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -1038,6 +1309,14 @@ func UnarrangeAllParticipants(c *gin.Context) {
 
 	// delete all participants
 	if err := models.DeleteCustomGameParticipantDAOs_byId(tx, req.Id); err != nil {
+		log.Error(err)
+		_ = tx.Rollback()
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// delete all color labels
+	if err := models.DeleteCustomGameParticipantColorLabels_byCustomGameConfigId(tx, req.Id); err != nil {
 		log.Error(err)
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
@@ -1289,6 +1568,14 @@ func RenewRanks(c *gin.Context) {
 
 		// get rank info
 		if err := service.RenewSummonerLeague(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		// get mastery info
+		if err := service.RenewSummonerMastery(tx, summonerDAO.Id, summonerDAO.Puuid); err != nil {
 			log.Error(err)
 			_ = tx.Rollback()
 			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")

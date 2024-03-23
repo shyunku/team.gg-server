@@ -16,8 +16,7 @@ create table teamgg.matches
     platform_id          varchar(255) not null,
     queue_id             int          not null,
     tournament_code      varchar(255) not null
-)
-    engine = InnoDB;
+);
 
 create table teamgg.match_participants
 (
@@ -87,8 +86,7 @@ create table teamgg.match_participants
     constraint match_participants_matches_match_id_fk
         foreign key (match_id) references teamgg.matches (match_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create table teamgg.match_participant_details
 (
@@ -145,8 +143,7 @@ create table teamgg.match_participant_details
     constraint match_participant_details_matches_match_id_fk
         foreign key (match_id) references teamgg.matches (match_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create table teamgg.match_participant_perk_styles
 (
@@ -159,8 +156,7 @@ create table teamgg.match_participant_perk_styles
     constraint match_participant_perk_styles_id_fk
         foreign key (match_participant_id) references teamgg.match_participants (match_participant_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create table teamgg.match_participant_perk_style_selections
 (
@@ -172,8 +168,7 @@ create table teamgg.match_participant_perk_style_selections
     constraint match_participant_perk_style_selection_id_fk
         foreign key (style_id) references teamgg.match_participant_perk_styles (style_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create index match_participant_perk_styles_description_index
     on teamgg.match_participant_perk_styles (description);
@@ -188,8 +183,7 @@ create table teamgg.match_participant_perks
     constraint match_participant_perks_id_fk
         foreign key (match_participant_id) references teamgg.match_participants (match_participant_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create index match_participants_champion_id_index
     on teamgg.match_participants (champion_id);
@@ -226,8 +220,7 @@ create table teamgg.match_teams
     constraint match_teams_matches_match_id_fk
         foreign key (match_id) references teamgg.matches (match_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create table teamgg.match_team_bans
 (
@@ -241,8 +234,7 @@ create table teamgg.match_team_bans
     constraint match_team_bans_matches_match_id_fk
         foreign key (match_id) references teamgg.matches (match_id)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create index match_teams_team_id_index
     on teamgg.match_teams (team_id);
@@ -266,8 +258,7 @@ create table teamgg.static_items
     gold_purchasable tinyint      not null,
     gold_total       int          not null,
     gold_sell        int          not null
-)
-    engine = InnoDB;
+);
 
 create table teamgg.static_item_tags
 (
@@ -276,8 +267,7 @@ create table teamgg.static_item_tags
     primary key (item_id, tag),
     constraint static_item_tags_ibfk_1
         foreign key (item_id) references teamgg.static_items (id)
-)
-    engine = InnoDB;
+);
 
 create index tag
     on teamgg.static_item_tags (tag);
@@ -302,8 +292,7 @@ create table teamgg.static_tier_ranks
         unique (score),
     constraint tier_label
         unique (tier_label, rank_label)
-)
-    engine = InnoDB;
+);
 
 create index rank_label
     on teamgg.static_tier_ranks (rank_label);
@@ -326,8 +315,7 @@ create table teamgg.summoners
     shorten_game_name varchar(255) not null,
     shorten_name      varchar(255) not null,
     last_updated_at   datetime     not null
-)
-    engine = InnoDB;
+);
 
 create table teamgg.leagues
 (
@@ -351,8 +339,7 @@ create table teamgg.leagues
     constraint ranks_summoner_puuid_fk
         foreign key (puuid) references teamgg.summoners (puuid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create index leagues_queue_type_index
     on teamgg.leagues (queue_type);
@@ -375,8 +362,7 @@ create table teamgg.masteries
     constraint masteries_summoner_puuid_fk
         foreign key (puuid) references teamgg.summoners (puuid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create index masteries_champion_id_champion_points_index
     on teamgg.masteries (champion_id asc, champion_points desc);
@@ -391,8 +377,7 @@ create table teamgg.summoner_matches
     constraint summoner_matches_summoners_puuid_fk
         foreign key (puuid) references teamgg.summoners (puuid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create table teamgg.summoner_rankings
 (
@@ -405,8 +390,7 @@ create table teamgg.summoner_rankings
     constraint summoner_rankings_summoners_puuid_fk
         foreign key (puuid) references teamgg.summoners (puuid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create index summoners_game_name_index
     on teamgg.summoners (game_name desc);
@@ -431,8 +415,7 @@ create table teamgg.users
     encrypted_pw varchar(255) not null,
     constraint user_id
         unique (user_id)
-)
-    engine = InnoDB;
+);
 
 create table teamgg.custom_game_configurations
 (
@@ -458,8 +441,7 @@ create table teamgg.custom_game_configurations
     constraint custom_game_configurations_users_uid_fk
         foreign key (creator_uid) references teamgg.users (uid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 
 create table teamgg.custom_game_candidates
 (
@@ -479,8 +461,17 @@ create table teamgg.custom_game_candidates
     constraint custom_game_candidates_summoners_puuid_fk
         foreign key (puuid) references teamgg.summoners (puuid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
+
+create table teamgg.custom_game_participant_color_labels
+(
+    custom_game_config_id varchar(255) not null,
+    puuid                 varchar(255) not null,
+    color_code            int          not null,
+    primary key (custom_game_config_id, puuid),
+    constraint custom_game_color_labels_configurations_id_fk
+        foreign key (custom_game_config_id) references teamgg.custom_game_configurations (id)
+);
 
 create table teamgg.custom_game_participants
 (
@@ -497,6 +488,5 @@ create table teamgg.custom_game_participants
     constraint custom_game_participants_summoners_puuid_fk
         foreign key (puuid) references teamgg.summoners (puuid)
             on update cascade on delete cascade
-)
-    engine = InnoDB;
+);
 

@@ -65,6 +65,16 @@ type SetCustomGameCandidateCustomTierRankRequestDto struct {
 	Rank               *string `json:"rank"`
 }
 
+type SetCustomGameCandidateCustomColorLabelRequestDto struct {
+	CustomGameConfigId string `json:"customGameConfigId" binding:"required"`
+	Puuid              string `json:"puuid" binding:"required"`
+	ColorCode          *int   `json:"colorCode" binding:"required,number,gte=0,lte=5"`
+}
+
+type DeleteCustomGameCandidateCustomColorLabelRequestDto struct {
+	CustomGameConfigId string `form:"customGameConfigId" binding:"required"`
+}
+
 type OptimizeCustomGameConfigurationRequestDto struct {
 	Id string `json:"id" binding:"required"`
 

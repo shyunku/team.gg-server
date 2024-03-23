@@ -621,6 +621,7 @@ func FindBalancedCustomGameConfig(
 	configId string,
 	originalTeamParticipantMap map[string]CustomGameTeamParticipantVO,
 	weights CustomGameConfigurationWeightsVO,
+	colorMap map[string]int,
 ) (*map[string]CustomGameTeamParticipantVO, error) {
 	participants := make([]CustomGameTeamParticipantVO, 0)
 	for _, participant := range originalTeamParticipantMap {
@@ -692,22 +693,64 @@ func FindBalancedCustomGameConfig(
 							socket.CustomConfigOptimizeProcessData{
 								Type:     socket.TypeCustomConfigOptimizeProcessCombinating,
 								Progress: float64(index) / float64(totalProcessibleCount),
+								Current:  int64(index),
+								Total:    totalProcessibleCount,
 							},
 						)
 					}
 					index += 1
-					fairness, err := getFairness(combination)
-					if err != nil {
-						log.Error(err)
-						return nil
+
+					// color code
+					team1ColorMap := make(map[int]int)
+					team2ColorMap := make(map[int]int)
+					for i, participant := range participants {
+						colorCode, exists := colorMap[participant.Summary.Puuid]
+						if !exists || colorCode == 0 {
+							continue
+						}
+						if combination[i].Team == 1 {
+							if _, exists := team1ColorMap[colorCode]; !exists {
+								team1ColorMap[colorCode] = 0
+							}
+							team1ColorMap[colorCode] += 1
+						} else {
+							if _, exists := team2ColorMap[colorCode]; !exists {
+								team2ColorMap[colorCode] = 0
+							}
+							team2ColorMap[colorCode] += 1
+						}
 					}
-					if fairness > highestFairness {
-						highestFairness = fairness
-						highestFairnessConfig = make(map[string]CustomGameTeamParticipantVO)
-						for i, participant := range participants {
-							participant.Team = combination[i].Team
-							participant.Position = combination[i].Position
-							highestFairnessConfig[participant.Summary.Puuid] = participant
+
+					colorCodeMatched := true
+					for i := 1; i <= 5; i++ {
+						team1ColorCount, exists1 := team1ColorMap[i]
+						team2ColorCount, exists2 := team2ColorMap[i]
+						if !exists1 {
+							team1ColorCount = 0
+						}
+						if !exists2 {
+							team2ColorCount = 0
+						}
+						if team1ColorCount > 0 && team2ColorCount > 0 {
+							colorCodeMatched = false
+							break
+						}
+					}
+
+					if colorCodeMatched {
+						fairness, err := getFairness(combination)
+						if err != nil {
+							log.Error(err)
+							return nil
+						}
+						if fairness > highestFairness {
+							highestFairness = fairness
+							highestFairnessConfig = make(map[string]CustomGameTeamParticipantVO)
+							for i, participant := range participants {
+								participant.Team = combination[i].Team
+								participant.Position = combination[i].Position
+								highestFairnessConfig[participant.Summary.Puuid] = participant
+							}
 						}
 					}
 				} else {
@@ -756,12 +799,14 @@ func calculateCustomGameConfigFairness(
 
 	favorWeight := func(favor int) float64 {
 		switch favor {
+		case -1:
+			return -1.0
 		case 0:
 			return 0.5
 		case 1:
-			return 1.0
-		case 2:
 			return 1.5
+		case 2:
+			return 2.0
 		default:
 			return 0.0
 		}
@@ -826,15 +871,19 @@ func calculateCustomGameConfigFairness(
 	topScoreDiff := math.Abs(team1TopScore - team2TopScore)
 	jungleScoreDiff := math.Abs(team1JungleScore - team2JungleScore)
 	midScoreDiff := math.Abs(team1MidScore - team2MidScore)
-	adcScoreDiff := math.Abs(team1AdcScore - team2AdcScore)
-	supportScoreDiff := math.Abs(team1SupportScore - team2SupportScore)
+	//adcScoreDiff := math.Abs(team1AdcScore - team2AdcScore)
+	//supportScoreDiff := math.Abs(team1SupportScore - team2SupportScore)
+	team1BottomScore := (team1AdcScore*weights.AdcInfluence + team1SupportScore*weights.SupportInfluence) / (weights.AdcInfluence + weights.SupportInfluence)
+	team2BottomScore := (team2AdcScore*weights.AdcInfluence + team2SupportScore*weights.SupportInfluence) / (weights.AdcInfluence + weights.SupportInfluence)
+	bottomScoreDiff := math.Abs(team1BottomScore - team2BottomScore)
 
 	var lineScoreDiffSum float64 = 0
 	lineScoreDiffSum += math.Pow(topScoreDiff, 2.0)
 	lineScoreDiffSum += math.Pow(jungleScoreDiff, 2.0)
 	lineScoreDiffSum += math.Pow(midScoreDiff, 2.0)
-	lineScoreDiffSum += math.Pow(adcScoreDiff, 2.0)
-	lineScoreDiffSum += math.Pow(supportScoreDiff, 2.0)
+	//lineScoreDiffSum += math.Pow(adcScoreDiff, 2.0)
+	//lineScoreDiffSum += math.Pow(supportScoreDiff, 2.0)
+	lineScoreDiffSum += math.Pow(bottomScoreDiff, 2.0)
 
 	// regularize (0~inf) -> (0~1)
 	var lineFairness float64 = 0
@@ -842,11 +891,13 @@ func calculateCustomGameConfigFairness(
 	if team1LineScore == 0 || team2LineScore == 0 {
 		lineFairness = 0
 	} else {
-		lineFairness = util.LogisticNormalize(lineScoreDiffSum, 1000)
+		lineFairness = util.LogisticNormalize(lineScoreDiffSum, 700)
 	}
+	//log.Debugf("Line fairness: %.5f, score: %.5f", lineScoreDiffSum, lineFairness)
 
-	// regularize line satisfaction (0~10) * 2 -> (0~1)
-	lineSatisfactionScore := lineSatisfaction / 20.0
+	// regularize line satisfaction (0~20) * 2 -> (0~1) -> (0~1) (biased to 1)
+	lineSatisfactionScore := math.Sqrt(lineSatisfaction / 40.0)
+	//log.Debugf("Line satisfaction: %.5f, score: %.5f", lineSatisfaction, lineSatisfactionScore)
 
 	// calculate tierFairness
 	var tierFairness float64 = 0
@@ -858,7 +909,7 @@ func calculateCustomGameConfigFairness(
 			tierFairness = 0
 		} else {
 			scaledDiffRate := util.PolynomialToInfiniteScale(tierScoreDiffRate)
-			tierFairness = util.LogisticNormalize(scaledDiffRate, 0.3)
+			tierFairness = util.LogisticNormalize(scaledDiffRate, 0.35)
 		}
 	}
 
