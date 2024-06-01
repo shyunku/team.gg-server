@@ -800,13 +800,13 @@ func calculateCustomGameConfigFairness(
 	favorWeight := func(favor int) float64 {
 		switch favor {
 		case -1:
-			return -1.0
+			return 0.0
 		case 0:
-			return 0.5
+			return 1.0
 		case 1:
-			return 1.5
-		case 2:
 			return 2.0
+		case 2:
+			return 3.0
 		default:
 			return 0.0
 		}
