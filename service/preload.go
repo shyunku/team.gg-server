@@ -300,26 +300,23 @@ func SanitizeAndLoadDataDragonFile() error {
 		log.Infof("Data dragon is already latest: %s", DataDragonVersion)
 	}
 
-	// remove sub files in tmp download dir (except latest)
+	// remove ddragon folders in dir (except latest)
 	files, err := os.ReadDir(dataDragonDirPath)
 	if err != nil {
 		return err
 	}
 	var ddragonEntries []os.DirEntry
-	var latestDdragonEntry *os.DirEntry
+	var latestDdragonEntry os.DirEntry
 	for _, file := range files {
 		ddragonEntries = append(ddragonEntries, file)
 		entryName := file.Name()
-		updateLatest := func() {
-			latestDdragonEntry = &file
-		}
 
 		if latestDdragonEntry == nil {
-			updateLatest()
+			latestDdragonEntry = file
 		} else {
-			latestVersion, err := version.NewVersion((*latestDdragonEntry).Name())
+			latestVersion, err := version.NewVersion(latestDdragonEntry.Name())
 			if err != nil {
-				log.Warnf("failed to parse version (%s)", (*latestDdragonEntry).Name())
+				log.Warnf("failed to parse version (%s)", latestDdragonEntry.Name())
 				continue
 			}
 			currentVersion, err := version.NewVersion(entryName)
@@ -329,15 +326,16 @@ func SanitizeAndLoadDataDragonFile() error {
 			}
 
 			if currentVersion.GreaterThan(latestVersion) {
-				updateLatest()
+				log.Debugf("version %s > %s", currentVersion, latestVersion)
+				latestDdragonEntry = file
 			}
 		}
 	}
 	if latestDdragonEntry != nil {
-		log.Infof("latest data dragon version: %s, keep alive", (*latestDdragonEntry).Name())
-		LocalDataDragonVersion = (*latestDdragonEntry).Name()
+		log.Infof("latest data dragon version: %s, keep alive", latestDdragonEntry.Name())
+		LocalDataDragonVersion = latestDdragonEntry.Name()
 		for _, file := range ddragonEntries {
-			if file == *latestDdragonEntry {
+			if file == latestDdragonEntry {
 				continue
 			}
 			removingDirPath := fmt.Sprintf("%s/%s", dataDragonDirPath, file.Name())
@@ -345,7 +343,7 @@ func SanitizeAndLoadDataDragonFile() error {
 			if err := os.RemoveAll(removingDirPath); err != nil {
 				log.Warnf("failed to remove old data dragon dir (%s)", file.Name())
 			}
-			log.Debugf("remove complete", file.Name())
+			log.Debugf("remove %s complete", file.Name())
 		}
 		if len(ddragonEntries) > 1 {
 			log.Debugf("%d old data dragon files removed", len(ddragonEntries)-1)
@@ -359,7 +357,7 @@ func SanitizeAndLoadDataDragonFile() error {
 	}
 
 	// remove old data dragon if exists (except latest)
-	// get all data dragon files
+	// get all data dragon tar files
 	files, err = os.ReadDir(tmpDownloadDirPath)
 	if err != nil {
 		return err
@@ -367,7 +365,7 @@ func SanitizeAndLoadDataDragonFile() error {
 
 	// remove old data dragon tar.gz files
 	var ddragonTarGzEntries []os.DirEntry
-	var latestDdragonTarGzEntry *os.DirEntry
+	var latestDdragonTarGzEntry os.DirEntry
 	var latestDdragonTarGzVersion string
 	for _, file := range files {
 		ddragonTarGzEntries = append(ddragonTarGzEntries, file)
@@ -381,7 +379,7 @@ func SanitizeAndLoadDataDragonFile() error {
 		}
 
 		updateLatest := func() {
-			latestDdragonTarGzEntry = &file
+			latestDdragonTarGzEntry = file
 			latestDdragonTarGzVersion = entryVersion
 		}
 
@@ -405,17 +403,20 @@ func SanitizeAndLoadDataDragonFile() error {
 		}
 	}
 	if latestDdragonTarGzEntry != nil {
-		log.Infof("latest data dragon tar.gz version: %s, keep alive", (*latestDdragonTarGzEntry).Name())
+		removed := 1
+		log.Infof("latest data dragon tar.gz version: %s, keep alive", latestDdragonTarGzEntry.Name())
 		for _, file := range ddragonTarGzEntries {
-			if file == *latestDdragonTarGzEntry {
+			if file == latestDdragonTarGzEntry {
 				continue
 			}
-			if err := os.RemoveAll(fmt.Sprintf("%s/%s", dataDragonDirPath, file.Name())); err != nil {
+			if err := os.RemoveAll(fmt.Sprintf("%s/%s", tmpDownloadDirPath, file.Name())); err != nil {
 				log.Warnf("failed to remove old data dragon tar.gz (%s)", file.Name())
+			} else {
+				removed++
 			}
 		}
-		if len(ddragonTarGzEntries) > 1 {
-			log.Debugf("%d old data dragon tar.gz removed", len(ddragonTarGzEntries)-1)
+		if removed > 0 {
+			log.Debugf("%d old data dragon tar.gz removed", removed)
 		}
 	}
 
