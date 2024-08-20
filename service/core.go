@@ -123,10 +123,12 @@ func RenewSummonerLeague(db db.Context, summonerId string, puuid string) error {
 		}
 
 		// create new league
+		now := time.Now()
 		leagueEntity := &models.LeagueDAO{
 			Puuid:        puuid,
 			LeagueId:     league.LeagueId,
 			QueueType:    league.QueueType,
+			UpdatedAt:    &now,
 			Tier:         league.Tier,
 			Rank:         league.Rank,
 			Wins:         league.Wins,
