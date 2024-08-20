@@ -20,6 +20,8 @@ const (
 
 	SummonerRankingRevisionPeriod = 7 * 24 * time.Hour
 
+	RecentVersionCount = 3 // 4 ~ 6 weeks
+
 	PositionTop     = "TOP"
 	PositionJungle  = "JUNGLE"
 	PositionMid     = "MID"

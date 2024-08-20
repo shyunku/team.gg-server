@@ -1,11 +1,10 @@
-package models
+package legacy_models
 
 import (
 	"team.gg-server/libs/db"
-	legacy_models "team.gg-server/models/legacy"
 )
 
-type MatchParticipantDetailDAO struct {
+type LegacyMatchParticipantDetailDAO struct {
 	MatchParticipantId string `db:"match_participant_id" json:"matchParticipantId"`
 
 	MatchId string `db:"match_id" json:"matchId"`
@@ -72,9 +71,9 @@ type MatchParticipantDetailDAO struct {
 	WardsPlaced int `db:"wards_placed" json:"wardsPlaced"`
 }
 
-func (m *MatchParticipantDetailDAO) Insert(db db.Context) error {
+func (m *LegacyMatchParticipantDetailDAO) Insert(db db.Context) error {
 	if _, err := db.Exec(`
-		INSERT INTO match_participant_details
+		INSERT INTO legacy_match_participant_details
 		    (match_participant_id, match_id, baron_kills, bounty_level, champion_transform,
 		     consumables_purchased, damage_dealt_to_buildings, damage_dealt_to_objectives, 
 		     damage_dealt_to_turrets, damage_self_mitigated, detector_wards_placed, 
@@ -104,72 +103,4 @@ func (m *MatchParticipantDetailDAO) Insert(db db.Context) error {
 		return err
 	}
 	return nil
-}
-
-func (m *MatchParticipantDetailDAO) ToLegacy() legacy_models.LegacyMatchParticipantDetailDAO {
-	return legacy_models.LegacyMatchParticipantDetailDAO{
-		MatchParticipantId:             m.MatchParticipantId,
-		MatchId:                        m.MatchId,
-		BaronKills:                     m.BaronKills,
-		BountyLevel:                    m.BountyLevel,
-		ChampionTransform:              m.ChampionTransform,
-		ConsumablesPurchased:           m.ConsumablesPurchased,
-		DamageDealtToBuildings:         m.DamageDealtToBuildings,
-		DamageDealtToObjectives:        m.DamageDealtToObjectives,
-		DamageDealtToTurrets:           m.DamageDealtToTurrets,
-		DamageSelfMitigated:            m.DamageSelfMitigated,
-		DetectorWardsPlaced:            m.DetectorWardsPlaced,
-		DragonKills:                    m.DragonKills,
-		PhysicalDamageDealt:            m.PhysicalDamageDealt,
-		MagicDamageDealt:               m.MagicDamageDealt,
-		TotalDamageDealt:               m.TotalDamageDealt,
-		LargestCriticalStrike:          m.LargestCriticalStrike,
-		LargestKillingSpree:            m.LargestKillingSpree,
-		LargestMultiKill:               m.LargestMultiKill,
-		FirstTowerAssist:               m.FirstTowerAssist,
-		FirstTowerKill:                 m.FirstTowerKill,
-		InhibitorKills:                 m.InhibitorKills,
-		InhibitorTakedowns:             m.InhibitorTakedowns,
-		InhibitorsLost:                 m.InhibitorsLost,
-		ItemsPurchased:                 m.ItemsPurchased,
-		KillingSprees:                  m.KillingSprees,
-		NexusKills:                     m.NexusKills,
-		NexusTakedowns:                 m.NexusTakedowns,
-		NexusLost:                      m.NexusLost,
-		LongestTimeSpentLiving:         m.LongestTimeSpentLiving,
-		ObjectiveStolen:                m.ObjectiveStolen,
-		ObjectiveStolenAssists:         m.ObjectiveStolenAssists,
-		SightWardsBoughtInGame:         m.SightWardsBoughtInGame,
-		VisionWardsBoughtInGame:        m.VisionWardsBoughtInGame,
-		SummonerId:                     m.SummonerId,
-		TimeCCingOthers:                m.TimeCCingOthers,
-		TimePlayed:                     m.TimePlayed,
-		TotalDamageShieldedOnTeammates: m.TotalDamageShieldedOnTeammates,
-		TotalTimeSpentDead:             m.TotalTimeSpentDead,
-		TotalUnitsHealed:               m.TotalUnitsHealed,
-		TrueDamageDealt:                m.TrueDamageDealt,
-		TurretKills:                    m.TurretKills,
-		TurretTakedowns:                m.TurretTakedowns,
-		TurretsLost:                    m.TurretsLost,
-		UnrealKills:                    m.UnrealKills,
-		WardsKilled:                    m.WardsKilled,
-		WardsPlaced:                    m.WardsPlaced,
-	}
-}
-
-func (m *MatchParticipantDetailDAO) Delete(db db.Context) error {
-	if _, err := db.Exec("DELETE FROM match_participant_details WHERE match_participant_id = ?", m.MatchParticipantId); err != nil {
-		return err
-	}
-	return nil
-}
-
-func GetMatchParticipantDetailDAOs_byMatchParticipantId(db db.Context, matchParticipantId string) (*MatchParticipantDetailDAO, error) {
-	var details MatchParticipantDetailDAO
-	if err := db.Get(&details, `
-		SELECT * FROM match_participant_details WHERE match_participant_id = ?;
-	`, matchParticipantId); err != nil {
-		return nil, err
-	}
-	return &details, nil
 }

@@ -12,6 +12,11 @@ type Promise[T any, K any] struct {
 	args     []T
 }
 
+/**
+ * NewPromise creates a new Promise instance.
+ * @param T any - The type of the argument to be passed to the promise function.
+ * @param K any - The type of the result of the promise function.
+ */
 func NewPromise[T any, K any]() *Promise[T, K] {
 	return &Promise[T, K]{
 		reserves: make([]PromiseFunction[T, K], 0),

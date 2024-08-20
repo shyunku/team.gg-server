@@ -1,13 +1,12 @@
-package models
+package legacy_models
 
 import (
 	"database/sql"
 	"errors"
 	"team.gg-server/libs/db"
-	legacy_models "team.gg-server/models/legacy"
 )
 
-type MatchParticipantDAO struct {
+type LegacyMatchParticipantDAO struct {
 	MatchId            string `db:"match_id" json:"matchId"`
 	ParticipantId      int    `db:"participant_id" json:"participantId"`
 	MatchParticipantId string `db:"match_participant_id" json:"matchParticipantId"`
@@ -90,9 +89,9 @@ type MatchParticipantDAO struct {
 	TeamEarlySurrendered      bool `db:"team_early_surrendered" json:"teamEarlySurrendered"`
 }
 
-func (m *MatchParticipantDAO) Insert(db db.Context) error {
+func (m *LegacyMatchParticipantDAO) Insert(db db.Context) error {
 	if _, err := db.Exec(`
-		INSERT INTO match_participants
+		INSERT INTO legacy_match_participants
 		    (match_id, participant_id, match_participant_id, puuid, kills, deaths, assists, 
 		     champion_id, champion_level, champion_name, champ_experience, summoner_level, 
 		     summoner_name, riot_id_name, riot_id_tag_line, profile_icon, 
@@ -129,97 +128,10 @@ func (m *MatchParticipantDAO) Insert(db db.Context) error {
 	return nil
 }
 
-func (m *MatchParticipantDAO) ToLegacy() legacy_models.LegacyMatchParticipantDAO {
-	return legacy_models.LegacyMatchParticipantDAO{
-		MatchId:                        m.MatchId,
-		ParticipantId:                  m.ParticipantId,
-		MatchParticipantId:             m.MatchParticipantId,
-		Puuid:                          m.Puuid,
-		Kills:                          m.Kills,
-		Deaths:                         m.Deaths,
-		Assists:                        m.Assists,
-		ChampionId:                     m.ChampionId,
-		ChampionLevel:                  m.ChampionLevel,
-		ChampionName:                   m.ChampionName,
-		ChampExperience:                m.ChampExperience,
-		SummonerLevel:                  m.SummonerLevel,
-		SummonerName:                   m.SummonerName,
-		RiotIdName:                     m.RiotIdName,
-		RiotIdTagLine:                  m.RiotIdTagLine,
-		ProfileIcon:                    m.ProfileIcon,
-		MagicDamageDealtToChampions:    m.MagicDamageDealtToChampions,
-		PhysicalDamageDealtToChampions: m.PhysicalDamageDealtToChampions,
-		TrueDamageDealtToChampions:     m.TrueDamageDealtToChampions,
-		TotalDamageDealtToChampions:    m.TotalDamageDealtToChampions,
-		MagicDamageTaken:               m.MagicDamageTaken,
-		PhysicalDamageTaken:            m.PhysicalDamageTaken,
-		TrueDamageTaken:                m.TrueDamageTaken,
-		TotalDamageTaken:               m.TotalDamageTaken,
-		TotalHeal:                      m.TotalHeal,
-		TotalHealsOnTeammates:          m.TotalHealsOnTeammates,
-		Item0:                          m.Item0,
-		Item1:                          m.Item1,
-		Item2:                          m.Item2,
-		Item3:                          m.Item3,
-		Item4:                          m.Item4,
-		Item5:                          m.Item5,
-		Item6:                          m.Item6,
-		Spell1Casts:                    m.Spell1Casts,
-		Spell2Casts:                    m.Spell2Casts,
-		Spell3Casts:                    m.Spell3Casts,
-		Spell4Casts:                    m.Spell4Casts,
-		Summoner1Casts:                 m.Summoner1Casts,
-		Summoner1Id:                    m.Summoner1Id,
-		Summoner2Casts:                 m.Summoner2Casts,
-		Summoner2Id:                    m.Summoner2Id,
-		FirstBloodAssist:               m.FirstBloodAssist,
-		FirstBloodKill:                 m.FirstBloodKill,
-		DoubleKills:                    m.DoubleKills,
-		TripleKills:                    m.TripleKills,
-		QuadraKills:                    m.QuadraKills,
-		PentaKills:                     m.PentaKills,
-		TotalMinionsKilled:             m.TotalMinionsKilled,
-		TotalTimeCCDealt:               m.TotalTimeCCDealt,
-		NeutralMinionsKilled:           m.NeutralMinionsKilled,
-		GoldSpent:                      m.GoldSpent,
-
-		GoldEarned:                m.GoldEarned,
-		IndividualPosition:        m.IndividualPosition,
-		TeamPosition:              m.TeamPosition,
-		Lane:                      m.Lane,
-		Role:                      m.Role,
-		TeamId:                    m.TeamId,
-		VisionScore:               m.VisionScore,
-		Win:                       m.Win,
-		GameEndedInEarlySurrender: m.GameEndedInEarlySurrender,
-		GameEndedInSurrender:      m.GameEndedInSurrender,
-		TeamEarlySurrendered:      m.TeamEarlySurrendered,
-	}
-}
-
-func (m *MatchParticipantDAO) Delete(db db.Context) error {
-	if _, err := db.Exec("DELETE FROM match_participants WHERE match_participant_id = ?", m.MatchParticipantId); err != nil {
-		return err
-	}
-	return nil
-}
-
-func GetMatchParticipantDAOs_byMatchId(db db.Context, matchId string) ([]MatchParticipantDAO, error) {
-	var matchParticipants []MatchParticipantDAO
-	if err := db.Select(&matchParticipants,
-		"SELECT * FROM match_participants WHERE match_id = ?", matchId); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return make([]MatchParticipantDAO, 0), nil
-		}
-		return nil, err
-	}
-	return matchParticipants, nil
-}
-
-func GetRandomMatchParticipantDAO(db db.Context) (*MatchParticipantDAO, bool, error) {
-	var matchParticipant MatchParticipantDAO
+func GetRandomLegacyMatchParticipantDAO(db db.Context) (*LegacyMatchParticipantDAO, bool, error) {
+	var matchParticipant LegacyMatchParticipantDAO
 	if err := db.Get(&matchParticipant,
-		"SELECT * FROM match_participants ORDER BY RAND() LIMIT 1"); err != nil {
+		"SELECT * FROM legacy_match_participants ORDER BY RAND() LIMIT 1"); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
 		}

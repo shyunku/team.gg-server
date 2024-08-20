@@ -10,6 +10,7 @@ import (
 	"sync"
 	"team.gg-server/controllers"
 	"team.gg-server/core"
+	"team.gg-server/dump"
 	"team.gg-server/libs/crypto"
 	"team.gg-server/libs/db"
 	"team.gg-server/service"
@@ -19,7 +20,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.5.6"
+const VERSION = "0.5.8"
 
 func main() {
 	fmt.Println(`
@@ -87,6 +88,12 @@ func main() {
 	if err := service.Preload(); err != nil {
 		log.Error(err)
 		os.Exit(-3)
+	}
+
+	// dump legacy matches
+	if err := dump.DumpMatchesToLegacy(); err != nil {
+		log.Error(err)
+		os.Exit(-6)
 	}
 
 	// print debug state
