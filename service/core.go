@@ -808,7 +808,7 @@ func calculateCustomGameConfigFairness(
 		case 1:
 			return 2.0
 		case 2:
-			return 3.0
+			return 4.0
 		default:
 			return 0.0
 		}

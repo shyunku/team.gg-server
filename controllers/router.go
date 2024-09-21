@@ -19,10 +19,6 @@ import (
 
 var GlobalLogger = log.GetLogger()
 
-func ping(c *gin.Context) {
-	c.String(200, "pong")
-}
-
 func SetupRouter() *gin.Engine {
 	gin.DefaultWriter = GlobalLogger
 	gin.DefaultErrorWriter = GlobalLogger
@@ -62,6 +58,10 @@ func SetupRouter() *gin.Engine {
 	})
 
 	return r
+}
+
+func ping(c *gin.Context) {
+	c.String(200, "pong")
 }
 
 func RunGin(ctx context.Context, waitGroup *sync.WaitGroup) {
