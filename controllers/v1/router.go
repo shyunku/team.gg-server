@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/shyunku-libraries/go-logger"
 	"net/http"
+	api2 "team.gg-server/controllers/v1/api"
 	"team.gg-server/controllers/v1/platform"
 	"team.gg-server/libs/db"
 	"team.gg-server/models"
@@ -19,6 +20,7 @@ func UseV1Router(r *gin.Engine) {
 	UseIconRouter(g)
 	UseAuthRouter(g)
 	platform.UsePlatformRouter(g)
+	api2.UseApiRouter(g)
 
 	g.GET("/summoner", GetSummonerInfo)
 	g.GET("/summoner-by-puuid", GetSummonerInfoByPuuid)

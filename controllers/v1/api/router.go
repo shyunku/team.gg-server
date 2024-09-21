@@ -9,7 +9,6 @@ import (
 	"team.gg-server/models"
 	"team.gg-server/service"
 	"team.gg-server/third_party/riot/api"
-	"team.gg-server/types"
 	"team.gg-server/util"
 )
 
@@ -92,34 +91,26 @@ func setSummonerLineFavor(c *gin.Context) {
 		return
 	}
 
-	if req.Strength == nil {
+	if len(req.Strengths) != 5 {
 		_ = tx.Rollback()
-		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid enabled")
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid line favor length")
 		return
 	}
 
-	if *req.Strength < -1 || *req.Strength > 2 {
-		_ = tx.Rollback()
-		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid strength")
-		return
+	for _, strength := range req.Strengths {
+		if strength < -1 || strength > 2 {
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusBadRequest, "invalid strength")
+			return
+		}
 	}
 
 	// update candidate
-	if req.FavorPosition == types.PositionTop {
-		candidateDAO.FlavorTop = *req.Strength
-	} else if req.FavorPosition == types.PositionJungle {
-		candidateDAO.FlavorJungle = *req.Strength
-	} else if req.FavorPosition == types.PositionMid {
-		candidateDAO.FlavorMid = *req.Strength
-	} else if req.FavorPosition == types.PositionAdc {
-		candidateDAO.FlavorAdc = *req.Strength
-	} else if req.FavorPosition == types.PositionSupport {
-		candidateDAO.FlavorSupport = *req.Strength
-	} else {
-		_ = tx.Rollback()
-		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid target position")
-		return
-	}
+	candidateDAO.FlavorTop = req.Strengths[0]
+	candidateDAO.FlavorJungle = req.Strengths[1]
+	candidateDAO.FlavorMid = req.Strengths[2]
+	candidateDAO.FlavorAdc = req.Strengths[3]
+	candidateDAO.FlavorSupport = req.Strengths[4]
 
 	if err := candidateDAO.Upsert(tx); err != nil {
 		log.Error(err)
