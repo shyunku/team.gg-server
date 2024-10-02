@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.7.0"
+const VERSION = "0.7.1"
 
 func main() {
 	fmt.Println(`
@@ -124,10 +124,10 @@ func main() {
 	statistics.InitializeStatisticRepos()
 
 	// start statistics repository loop
-	//log.Info("Starting statistics repository loops...")
-	//go statistics.ChampionDetailStatisticsRepo.Loop()
-	//go statistics.TierStatisticsRepo.Loop()
-	//go statistics.MasteryStatisticsRepo.Loop()
+	log.Info("Starting statistics repository loops...")
+	go statistics.ChampionDetailStatisticsRepo.Loop()
+	go statistics.TierStatisticsRepo.Loop()
+	go statistics.MasteryStatisticsRepo.Loop()
 
 	// Run web server with gin
 	waitGroup.Add(1)
