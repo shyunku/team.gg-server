@@ -6,7 +6,10 @@ type GetSummonerPuuidRequestDto struct {
 }
 
 type SetSummonerLineFavorRequestDto struct {
-	CustomGameConfigId string `json:"customGameConfigId" binding:"required"`
-	Puuid              string `json:"puuid" binding:"required"`
-	Strengths          []int  `json:"strength" binding:"required"`
+	UserId    string `json:"userId" binding:"required"`
+	Strengths []int  `json:"strengths" binding:"required"`
+}
+
+type GetDiscordIntegrationsRequestDto struct {
+	Token string `form:"token" binding:"required"`
 }

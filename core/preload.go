@@ -12,6 +12,10 @@ var (
 	DebugMode     = false
 	DebugOnProd   = false
 	UrgentMode    = false
+
+	RsoClientId          = os.Getenv("RSO_CLIENT_ID")
+	RsoClientSecret      = os.Getenv("RSO_CLIENT_SECRET")
+	RsoClientCallbackUri = os.Getenv("RSO_CLIENT_CALLBACK_URI")
 )
 
 func Preload() error {

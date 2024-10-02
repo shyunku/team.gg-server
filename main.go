@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.6.0"
+const VERSION = "0.7.0"
 
 func main() {
 	fmt.Println(`
@@ -59,6 +59,9 @@ func main() {
 		"JWT_ACCESS_EXPIRE",
 		"JWT_REFRESH_SECRET",
 		"JWT_REFRESH_EXPIRE",
+		"RSO_CLIENT_ID",
+		"RSO_CLIENT_SECRET",
+		"RSO_CLIENT_CALLBACK_URI",
 		"DEBUG",
 	}); err != nil {
 		log.Error(err)

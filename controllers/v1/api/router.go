@@ -17,6 +17,7 @@ func UseApiRouter(r *gin.RouterGroup) {
 
 	g.GET("/summonerPuuid", getSummonerPuuid)
 	g.POST("/summonerLineFavor", setSummonerLineFavor)
+	g.GET("/discordIntegrations", getDiscordIntegrations)
 }
 
 func getSummonerPuuid(c *gin.Context) {
@@ -78,19 +79,6 @@ func setSummonerLineFavor(c *gin.Context) {
 		return
 	}
 
-	candidateDAO, exists, err := models.GetCustomGameCandidateDAO_byPuuid(tx, req.CustomGameConfigId, req.Puuid)
-	if err != nil {
-		log.Error(err)
-		_ = tx.Rollback()
-		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
-		return
-	}
-	if !exists {
-		_ = tx.Rollback()
-		util.AbortWithStrJson(c, http.StatusBadRequest, "candidate not found")
-		return
-	}
-
 	if len(req.Strengths) != 5 {
 		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid line favor length")
@@ -105,25 +93,48 @@ func setSummonerLineFavor(c *gin.Context) {
 		}
 	}
 
-	// update candidate
-	candidateDAO.FlavorTop = req.Strengths[0]
-	candidateDAO.FlavorJungle = req.Strengths[1]
-	candidateDAO.FlavorMid = req.Strengths[2]
-	candidateDAO.FlavorAdc = req.Strengths[3]
-	candidateDAO.FlavorSupport = req.Strengths[4]
-
-	if err := candidateDAO.Upsert(tx); err != nil {
+	// get integrations
+	discordIntegrations, err := models.GetThirdPartyIntegrationDAOs_byPlatformAndToken(db.Root, "discord", req.UserId)
+	if err != nil {
 		log.Error(err)
-		_ = tx.Rollback()
 		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	if err := service.RecalculateCustomGameBalance(tx, req.CustomGameConfigId); err != nil {
-		log.Error(err)
-		_ = tx.Rollback()
-		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
-		return
+	customGameConfigIdList := make([]string, 0)
+	for _, discordIntegration := range discordIntegrations {
+		candidateDAOs, err := models.GetCustomGameCandidateDAOs_byPuuid(tx, discordIntegration.Puuid)
+		if err != nil {
+			log.Error(err)
+			_ = tx.Rollback()
+			util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		for _, candidateDAO := range candidateDAOs {
+			// update candidate
+			candidateDAO.FlavorTop = req.Strengths[0]
+			candidateDAO.FlavorJungle = req.Strengths[1]
+			candidateDAO.FlavorMid = req.Strengths[2]
+			candidateDAO.FlavorAdc = req.Strengths[3]
+			candidateDAO.FlavorSupport = req.Strengths[4]
+
+			if err := candidateDAO.Upsert(tx); err != nil {
+				log.Error(err)
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+				return
+			}
+
+			if err := service.RecalculateCustomGameBalance(tx, candidateDAO.CustomGameConfigId); err != nil {
+				log.Error(err)
+				_ = tx.Rollback()
+				util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+				return
+			}
+
+			customGameConfigIdList = append(customGameConfigIdList, candidateDAO.CustomGameConfigId)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -133,6 +144,31 @@ func setSummonerLineFavor(c *gin.Context) {
 		return
 	}
 
-	socket.SocketIO.BroadcastToCustomConfigRoom(req.CustomGameConfigId, socket.EventCustomConfigUpdated, nil)
+	for _, customGameConfigId := range customGameConfigIdList {
+		socket.SocketIO.BroadcastToCustomConfigRoom(customGameConfigId, socket.EventCustomConfigUpdated, nil)
+	}
 	c.JSON(http.StatusOK, nil)
+}
+
+func getDiscordIntegrations(c *gin.Context) {
+	var req GetDiscordIntegrationsRequestDto
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if req.Token == "" {
+		util.AbortWithStrJson(c, http.StatusBadRequest, "invalid token")
+		return
+	}
+
+	discordIntegrations, err := models.GetThirdPartyIntegrationDAOs_byPlatformAndToken(db.Root, "discord", req.Token)
+	if err != nil {
+		log.Error(err)
+		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, discordIntegrations)
 }
