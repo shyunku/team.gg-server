@@ -31,6 +31,8 @@ func CheckEnvironmentVariables(checkKeys []string) error {
 		if os.Getenv(key) == "" {
 			missingVariables = append(missingVariables, key)
 		}
+
+		log.Debugf("env[%s]: %s", key, os.Getenv(key))
 	}
 
 	if len(missingVariables) > 0 {
