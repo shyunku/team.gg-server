@@ -125,39 +125,21 @@ func Logout(c *gin.Context) {
 }
 
 func RsoLogin(c *gin.Context) {
-	codeRaw, codeExists := c.GetQuery("code")
+	code, codeExists := c.GetQuery("code")
 	if !codeExists {
 		util.AbortWithStrJson(c, http.StatusBadRequest, "code not found")
 		return
 	}
-	code, err := url.QueryUnescape(codeRaw)
-	if err != nil {
-		log.Error(err)
-		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
-		return
-	}
 
-	issRaw, issExists := c.GetQuery("iss")
+	iss, issExists := c.GetQuery("iss")
 	if !issExists {
 		util.AbortWithStrJson(c, http.StatusBadRequest, "iss not found")
 		return
 	}
-	iss, err := url.QueryUnescape(issRaw)
-	if err != nil {
-		log.Error(err)
-		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
-		return
-	}
 
-	stateRaw, stateExists := c.GetQuery("state")
+	state, stateExists := c.GetQuery("state")
 	if !stateExists {
 		util.AbortWithStrJson(c, http.StatusBadRequest, "state not found")
-		return
-	}
-	state, err := url.QueryUnescape(stateRaw)
-	if err != nil {
-		log.Error(err)
-		util.AbortWithStrJson(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	splitedStates := strings.Split(state, "|")
