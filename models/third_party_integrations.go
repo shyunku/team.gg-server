@@ -45,7 +45,7 @@ func GetThirdPartyIntegrationDAOs_byPlatformAndToken(db db.Context, platform, to
 	var integrations []ThirdPartyIntegrationDAO
 	if err := db.Select(&integrations, "SELECT * FROM third_party_integrations WHERE platform = ? AND token = ?", platform, token); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return make([]ThirdPartyIntegrationDAO, 0), nil
+			return []ThirdPartyIntegrationDAO{}, nil
 		}
 		return nil, err
 	}
