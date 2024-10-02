@@ -18,6 +18,8 @@ func UseAuthRouter(r *gin.RouterGroup) {
 	g.POST("/login", Login)
 	g.POST("/signup", Signup)
 	g.POST("/logout", Logout)
+	g.GET("/rsoLogin", RsoLogin)
+	g.GET("/rsoLogout", RsoLogout)
 }
 
 func Login(c *gin.Context) {
@@ -115,4 +117,18 @@ func Logout(c *gin.Context) {
 	// delete cookie
 	util2.DeleteAccessTokenCookie(c)
 	c.JSON(http.StatusOK, nil)
+}
+
+func RsoLogin(c *gin.Context) {
+	//code, codeExists := c.GetQuery("code")
+	//if !codeExists {
+	//	util.AbortWithStrJson(c, http.StatusBadRequest, "code not found")
+	//	return
+	//}
+
+	c.JSON(http.StatusOK, "ok")
+}
+
+func RsoLogout(c *gin.Context) {
+	c.JSON(http.StatusOK, "ok")
 }

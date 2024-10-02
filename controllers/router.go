@@ -83,7 +83,7 @@ func RunGin(ctx context.Context, waitGroup *sync.WaitGroup) {
 	}()
 
 	// 서버 시작
-	if core.DebugMode {
+	if core.DebugMode || true {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 			os.Exit(-3)
