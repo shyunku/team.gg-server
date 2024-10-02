@@ -41,6 +41,11 @@ func Preload() error {
 
 	AppServerHost = ipv4
 	AppServerPort = os.Getenv("APP_SERVER_PORT")
+
+	RsoClientId = os.Getenv("RSO_CLIENT_ID")
+	RsoClientSecret = os.Getenv("RSO_CLIENT_SECRET")
+	RsoClientCallbackUri = os.Getenv("RSO_CLIENT_CALLBACK_URI")
+
 	log.Debugf("server is active on public ip: %s:%s", AppServerHost, AppServerPort)
 	return nil
 }
