@@ -182,6 +182,13 @@ func RsoLogin(c *gin.Context) {
 	req.SetBasicAuth(username, password)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	log.Debugf("code: %s", code)
+	log.Debugf("iss: %s", iss)
+	log.Debugf("state: %s", state)
+	log.Debugf("redirect_uri: %s", callbackUri)
+	log.Debugf("username: %s", username)
+	log.Debugf("password: %s", password)
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
